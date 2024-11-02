@@ -4,7 +4,6 @@ import TabNavigator from './TabNavigator';
 import NewPassword from '../screens/NewPassword';
 import * as LocalAuthentication from 'expo-local-authentication';
 import { View, Text } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 
 const Stack = createNativeStackNavigator();
 

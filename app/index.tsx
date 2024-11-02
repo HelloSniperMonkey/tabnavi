@@ -1,15 +1,13 @@
 import React from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { PasswordProvider } from './components/PasswordContext';
-import AuthStack from './navigation/AuthStack';
-import MainStack from './navigation/MainStack';
+import { PasswordProvider, KeyProvider } from './components/PasswordContext';
+import MainStack from './navigation/Biometric';
 import { Firebase_Auth } from '../FirebaseConfig';
 import { useState, useEffect } from 'react';
 import { User } from 'firebase/auth';
 import { View, Text } from 'react-native';
 import Login from './screens/Login';
-import TabNavigator from './navigation/TabNavigator';
 
 const RootStack = createNativeStackNavigator();
 
@@ -36,16 +34,18 @@ export default function Index() {
   }
 
   return (
-    <PasswordProvider>
-      <NavigationContainer independent={true}>
-        <RootStack.Navigator initialRouteName='Login'>
-        {user ? (
-          <RootStack.Screen name="PasswordList" component={MainStack} options={{ headerShown: false }} />
-        ) : (
-          <RootStack.Screen name="Login" component={Login} options={{ headerShown: false }} />
-        )}
-        </RootStack.Navigator>
-      </NavigationContainer>
-    </PasswordProvider>
+    <KeyProvider>
+      <PasswordProvider>
+        <NavigationContainer independent={true}>
+          <RootStack.Navigator initialRouteName='Login'>
+            {user ? (
+              <RootStack.Screen name="PasswordList" component={MainStack} options={{ headerShown: false }} />
+            ) : (
+              <RootStack.Screen name="Login" component={Login} options={{ headerShown: false }} />
+            )}
+          </RootStack.Navigator>
+        </NavigationContainer>
+      </PasswordProvider>
+    </KeyProvider>
   );
 }

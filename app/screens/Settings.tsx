@@ -4,26 +4,84 @@ import { Alert } from 'react-native';
 import { signOut } from "firebase/auth";
 import { Firebase_Auth } from "../../FirebaseConfig";
 import { useNavigation } from "@react-navigation/native";
+import { useKey, usePassword } from '../components/PasswordContext';
+import { checkDataBreaches } from '../components/DataBreach';
+import * as SecureStore from 'expo-secure-store';
+
+const LAST_BREACH_CHECK_KEY = 'last_breach_check';
 
 export default function Index() {
   const [isSyncEnabled, setIsSyncEnabled] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const navigation = useNavigation();
+  const { passwords, updateBreachResults , clearPasswords} = usePassword();
+  const { clearKeys } = useKey();
 
   const toggleSwitch = () => setIsSyncEnabled(previousState => !previousState);
 
   const Logout = async () => {
     try {
-      setIsLoading(true);
-      await signOut(Firebase_Auth);
-      navigation.navigate('Login');
+        setIsLoading(true);
+        
+        await clearPasswords(); // Clear stored passwords
+        clearKeys(); // Reset keys to default
+        await signOut(Firebase_Auth);
+        navigation.navigate('Login');
     } catch (error) {
-      Alert.alert('Logout Error', 'An error occurred while logging out. Please try again.');
-      console.error(error);
+        Alert.alert('Logout Error', 'An error occurred while logging out. Please try again.');
+        console.error(error);
     } finally {
-      setIsLoading(false);
+        setIsLoading(false);
     }
-  }
+};
+
+  const DataBreachChecker = async () => {
+    try {
+        setIsLoading(true);
+        
+        // Use the passwords from context
+        const results = await checkDataBreaches(passwords);
+        
+        // Update breach results using context
+        await updateBreachResults(results);
+        
+        // Save last check time
+        await SecureStore.setItemAsync(LAST_BREACH_CHECK_KEY, Date.now().toString());
+
+        // Notify user of breaches
+        const newBreaches = results.filter(result => result.isBreached);
+        if (newBreaches.length > 0) {
+            Alert.alert(
+                "Security Alert",
+                `Data breach detected for ${newBreaches.length} account(s). Please consider updating your passwords.`,
+                [{ text: "OK" }]
+            );
+        } else {
+            Alert.alert(
+                "Security Check Complete",
+                "Good news! None of your accounts were found in any known data breaches.",
+                [{ text: "OK" }]
+            );
+        }
+    } catch (error) {
+        if (error === 'Error: 429') {
+            Alert.alert(
+                "Rate Limit Exceeded",
+                "Too many requests. Please try again after 1 hour.",
+                [{ text: "OK" }]
+            );
+        } else {
+            Alert.alert(
+                "Error",
+                "An error occurred while checking for data breaches. Please try again later.",
+                [{ text: "OK" }]
+            );
+        }
+        console.error("Error checking for breaches:", error);
+    } finally {
+        setIsLoading(false);
+    }
+  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -38,13 +96,26 @@ export default function Index() {
           />
         </View>
       </View>
-      
+      <View style={styles.bottomContainer2}>
+        <TouchableOpacity
+          style={[styles.primaryButton, isLoading && styles.disabledButton]}
+          onPress={DataBreachChecker}
+          disabled={isLoading}
+        >
+          <Text style={styles.primaryButtonText}>
+            {isLoading ? "Checking..." : "Check Data Breach Now"}
+          </Text>
+        </TouchableOpacity>
+      </View>
       <View style={styles.bottomContainer}>
         <TouchableOpacity
-          style={styles.primaryButton}
+          style={[styles.primaryButton, { backgroundColor: '#FF3B30' }, isLoading && styles.disabledButton]}
           onPress={Logout}
+          disabled={isLoading}
         >
-          <Text style={styles.primaryButtonText}>Logout</Text>
+          <Text style={styles.primaryButtonText}>
+            {isLoading ? "Loading..." : "Logout"}
+          </Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>
@@ -59,9 +130,18 @@ const styles = StyleSheet.create({
   contentContainer: {
     padding: 16,
   },
-  bottomContainer: {
+  bottomContainer2: {
+    flex: 1,
     padding: 16,
-    paddingBottom: 16, // Adjust this value based on your bottom tab height
+    paddingBottom: 80,
+    position: 'absolute',
+    bottom: 0,
+    width: '100%',
+  },
+  bottomContainer: {
+    flex: 1,
+    padding: 16,
+    paddingBottom: 16,
     position: 'absolute',
     bottom: 0,
     width: '100%',
@@ -98,6 +178,9 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
+  },
+  disabledButton: {
+    opacity: 0.6,
   },
   primaryButtonText: {
     color: '#fff',

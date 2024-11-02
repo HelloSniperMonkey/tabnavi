@@ -1,18 +1,28 @@
 import React, { useState, useEffect } from 'react';
 import { Text, View, FlatList, StyleSheet, TouchableOpacity, Alert, Clipboard } from "react-native";
 import { ListItem, Icon, Button } from '@rneui/themed';
-import { usePassword, MasterPassword } from './PasswordContext';
+import { usePassword, useKey } from './PasswordContext';
 import * as SecureStore from 'expo-secure-store';
+import { checkDataBreaches, BreachResult } from './DataBreach';
 
 import AES from 'crypto-js/aes';
 import Utf8 from 'crypto-js/enc-utf8';
 import Hex from 'crypto-js/enc-hex';
 import CryptoJS from 'crypto-js';
 
+const BREACH_CHECK_INTERVAL = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
+const LAST_BREACH_CHECK_KEY = 'last_breach_check';
+
 export default function List() {
-  const { passwords, setPasswords } = usePassword();
+  const {BREACH_RESULTS_KEY, MasterPassword, SECURE_STORE_KEY} = useKey();
+  const { passwords, setPasswords ,breachResults , updateBreachResults , loadData} = usePassword();
   const [expandedItems, setExpandedItems] = useState({});
   const [hide, setHide] = useState({});
+
+  const getBreachStatus = (username: string) => {
+    const result = breachResults.find(r => r.email === username);
+    return result?.isBreached || false;
+  };
 
   const decrypt = (encryptedData = '', encryptionKey = '') => {
     const [ivHex, encryptedText] = encryptedData.split(':');
@@ -29,9 +39,71 @@ export default function List() {
     return decrypted.toString(Utf8);
   };
 
+  const checkForBreaches = async () => {
+    try {
+      // Check if it's time to run breach check
+      const lastCheck = await SecureStore.getItemAsync(LAST_BREACH_CHECK_KEY);
+      const lastCheckTime = lastCheck ? parseInt(lastCheck) : 0;
+      const now = Date.now();
+
+      if (now - lastCheckTime >= BREACH_CHECK_INTERVAL) {
+        // Run breach check
+        const results = await checkDataBreaches(passwords);
+        updateBreachResults(results);
+
+        // Save results and update last check time
+        await SecureStore.setItemAsync(BREACH_RESULTS_KEY, JSON.stringify(results));
+        await SecureStore.setItemAsync(LAST_BREACH_CHECK_KEY, now.toString());
+
+        // Notify user of any breaches
+        const newBreaches = results.filter(result => result.isBreached);
+        if (newBreaches.length > 0) {
+          Alert.alert(
+            "Security Alert",
+            `Data breach detected for ${newBreaches.length} account(s). Please consider updating your passwords.`,
+            [{ text: "OK" }]
+          );
+        }
+      } else {
+        // Load previous results
+        const savedResults = await SecureStore.getItemAsync(BREACH_RESULTS_KEY);
+        if (savedResults) {
+          updateBreachResults(JSON.parse(savedResults));
+        }
+      }
+    } catch (error) {
+      console.error("Error checking for breaches:", error);
+    }
+  };
+
+  const getSecurityStyles = (username: string) => {
+    const isBreached = getBreachStatus(username);
+    return {
+      container: {
+        ...styles.listItem,
+        backgroundColor: isBreached ? styles.breachedItem.backgroundColor : styles.secureItem.backgroundColor,
+        borderLeftWidth: 4,
+        borderLeftColor: isBreached ? '#ff3b30' : '#34c759',
+      },
+      title: {
+        ...styles.title,
+        color: isBreached ? styles.breachedItem.color : styles.secureItem.color,
+      },
+      subtitle: {
+        ...styles.subtitle,
+        color: isBreached ? styles.breachedItem.subColor : styles.secureItem.subColor,
+      },
+    };
+  };
+
   useEffect(() => {
     setExpandedItems({});
     setHide({});
+    checkForBreaches();
+    const load = async () => {
+      await loadData();
+    }
+    load();
   }, [passwords.length]);
 
   const toggleHide = (index) => {
@@ -52,8 +124,6 @@ export default function List() {
     Clipboard.setString(text);
     Alert.alert("Copied", "Password copied to clipboard");
   };
-
-  const SECURE_STORE_KEY = 'encrypted_passwords';
 
   const deleteItem = (index) => {
     Alert.alert(
@@ -99,55 +169,86 @@ export default function List() {
         <FlatList
           data={passwords}
           keyExtractor={(item, index) => index.toString()}
-          renderItem={({ item, index }) => (
-            <View>
-              <TouchableOpacity onPress={() => toggleExpand(index)}>
-                <ListItem containerStyle={styles.listItem} bottomDivider>
-                  <ListItem.Content>
-                    <ListItem.Title style={styles.title}>
-                      {item.website || item.name}
-                    </ListItem.Title>
-                    <ListItem.Subtitle style={styles.subtitle}>
-                      {item.username || item.subtitle}
-                    </ListItem.Subtitle>
-                  </ListItem.Content>
-                  <Icon
-                    name={expandedItems[index] ? "expand-less" : "expand-more"}
-                    type="material"
-                    color="#6e6e6e"
-                  />
-                </ListItem>
-              </TouchableOpacity>
+          renderItem={({ item, index }) => {
+            const securityStyles = getSecurityStyles(item.username);
+            const isBreached = getBreachStatus(item.username);
 
-              {expandedItems[index] && (
-                <View style={styles.expandedContainer}>
-                  <Text style={styles.passwordText}>
-                    Password: {hide[index] ? decrypt(item.encryptedpassword, decrypt(item.encryptedEncryptionKey, MasterPassword)) : "******"}
-                  </Text>
-                  <TouchableOpacity
-                    style={styles.visibility}
-                    onPress={() => toggleHide(index)}
-                  >
+            return (
+              <View>
+                <TouchableOpacity onPress={() => toggleExpand(index)}>
+                  <ListItem containerStyle={securityStyles.container} bottomDivider>
+                    <ListItem.Content>
+                      <View style={styles.titleContainer}>
+                        <ListItem.Title style={securityStyles.title}>
+                          {item.website || item.name}
+                        </ListItem.Title>
+                        {isBreached && (
+                          <Icon
+                            name="warning"
+                            type="material"
+                            color="#ff3b30"
+                            size={16}
+                            style={styles.warningIcon}
+                          />
+                        )}
+                      </View>
+                      <ListItem.Subtitle style={securityStyles.subtitle}>
+                        {item.username || item.subtitle}
+                      </ListItem.Subtitle>
+                      {isBreached && (
+                        <Text style={styles.breachWarning}>
+                          Data breach detected - Update recommended
+                        </Text>
+                      )}
+                    </ListItem.Content>
                     <Icon
-                      name={hide[index] ? "visibility-off" : "visibility"}
+                      name={expandedItems[index] ? "expand-less" : "expand-more"}
                       type="material"
-                      color="#6e6e6e"
+                      color={isBreached ? "#ff3b30" : "#34c759"}
                     />
-                  </TouchableOpacity>
-                  <Button
-                    title="Copy"
-                    buttonStyle={styles.copyButton}
-                    onPress={() => copyToClipboard(item.password)}
-                  />
-                  <Button
-                    title="Delete"
-                    buttonStyle={styles.deleteButton}
-                    onPress={() => deleteItem(index)}
-                  />
-                </View>
-              )}
-            </View>
-          )}
+                  </ListItem>
+                </TouchableOpacity>
+
+                {expandedItems[index] && (
+                  <View style={[styles.expandedContainer, isBreached && styles.breachedExpandedContainer]}>
+                    <Text style={styles.passwordText}>
+                      Password: {hide[index] ? decrypt(item.encryptedpassword, decrypt(item.encryptedEncryptionKey, MasterPassword)) : "******"}
+                    </Text>
+                    <TouchableOpacity
+                      style={styles.visibility}
+                      onPress={() => toggleHide(index)}
+                    >
+                      <Icon
+                        name={hide[index] ? "visibility-off" : "visibility"}
+                        type="material"
+                        color="#6e6e6e"
+                      />
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.visibility}
+                      onPress={() => copyToClipboard(decrypt(item.encryptedpassword, decrypt(item.encryptedEncryptionKey, MasterPassword)))}
+                    >
+                      <Icon
+                        name="content-copy"
+                        type="material"
+                        color="#6e6e6e"
+                      />
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.visibility}
+                      onPress={() => deleteItem(index)}
+                    >
+                      <Icon
+                        name="delete"
+                        type="material"
+                        color="#6e6e6e"
+                      />
+                    </TouchableOpacity>
+                  </View>
+                )}
+              </View>
+            );
+          }}
         />
       )}
     </View>
@@ -184,6 +285,10 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 3,
   },
+  titleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
   title: {
     fontSize: 16,
     fontWeight: "bold",
@@ -192,6 +297,21 @@ const styles = StyleSheet.create({
   subtitle: {
     fontSize: 14,
     color: "#666",
+  },
+  breachedItem: {
+    backgroundColor: "#fff8f8",
+    color: "#ff3b30",
+    subColor: "#ff6961",
+  },
+  secureItem: {
+    backgroundColor: "#f8fff8",
+    color: "#34c759",
+    subColor: "#666",
+  },
+  breachWarning: {
+    color: "#ff3b30",
+    fontSize: 12,
+    marginTop: 4,
   },
   expandedContainer: {
     flexDirection: 'row',
@@ -202,22 +322,18 @@ const styles = StyleSheet.create({
     borderBottomLeftRadius: 8,
     borderBottomRightRadius: 8,
   },
+  breachedExpandedContainer: {
+    backgroundColor: "#ffefef",
+  },
   passwordText: {
     flex: 1,
     fontSize: 14,
     color: "#333",
   },
-  copyButton: {
-    backgroundColor: "#007bff",
-    paddingHorizontal: 10,
-    marginLeft: 10,
-  },
-  deleteButton: {
-    backgroundColor: "#ff3b30",
-    paddingHorizontal: 10,
-    marginLeft: 10,
-  },
   visibility: {
     paddingHorizontal: 10,
+  },
+  warningIcon: {
+    marginLeft: 8,
   },
 });

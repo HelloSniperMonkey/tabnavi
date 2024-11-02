@@ -2,6 +2,7 @@ import { View, Text, StyleSheet, TextInput, ActivityIndicator, TouchableOpacity,
 import React, { useState } from 'react';
 import { Firebase_Auth } from '../../FirebaseConfig';
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail } from 'firebase/auth';
+import { useKey, usePassword } from '../components/PasswordContext';
 
 const Login = () => {
     const [email, setEmail] = useState('');
@@ -9,12 +10,28 @@ const Login = () => {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
     const auth = Firebase_Auth;
+    const {loadData} = usePassword();
+    const {MasterPassword, setMasterPassword, SECURE_STORE_KEY, setSECURE_STORE_KEY, BREACH_RESULTS_KEY, setBREACH_RESULTS_KEY} = useKey();
+    const s="internal-storage-encrypted-passwords", b="breach-results-stored-in-my-app",m="hellomyappisgood";
 
     const signIn = async () => {
         setLoading(true);
         setError('');
+        const e = email.split('@')[0] + email.split('@')[1];
+        
         try {
+            // First attempt to sign in
             const response = await signInWithEmailAndPassword(auth, email, password);
+            
+            // If successful, update keys and load new data
+            setSECURE_STORE_KEY(e + s);
+            setBREACH_RESULTS_KEY(e + b);
+            setMasterPassword(e + m);
+            
+            
+            // Force reload data with new keys
+            await loadData();
+            
             console.log(response);
         } catch (error: any) {
             setError(error.message);
@@ -22,11 +39,16 @@ const Login = () => {
         } finally {
             setLoading(false);
         }
-    }
+    };
 
     const signUp = async () => {
         setLoading(true);
         setError('');
+        const e = email.split('@')[0]+email.split('@')[1];
+
+        setSECURE_STORE_KEY(e+s);
+        setBREACH_RESULTS_KEY(e+b);
+        setMasterPassword(e+m);
         try {
             const response = await createUserWithEmailAndPassword(auth, email, password);
             console.log(response);

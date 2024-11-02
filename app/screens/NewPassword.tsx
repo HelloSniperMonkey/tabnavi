@@ -5,7 +5,7 @@ import WordArray from 'crypto-js/lib-typedarrays';
 import CryptoJS from 'crypto-js';
 import React, { useState , useEffect } from "react";
 import { View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet , Alert } from "react-native";
-import { usePassword, MasterPassword } from '../components/PasswordContext';
+import { usePassword, useKey } from '../components/PasswordContext';
 import uuid from 'react-native-uuid';
 import * as SecureStore from 'expo-secure-store';
 import { Firebase_Auth, Firebase_DB } from "../../FirebaseConfig";
@@ -13,11 +13,13 @@ import { collection, addDoc, getDocs, query, where } from "firebase/firestore";
 import NetInfo from "@react-native-community/netinfo";
 
 function PasswordForm({ navigation }) {
+  const {SECURE_STORE_KEY , MasterPassword} = useKey();
   const { passwords, setPasswords } = usePassword();
   const [website, setWebsite] = useState('');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [isSyncEnabled, setIsSyncEnabled] = useState(false);
+  const [strength, setStrength] = useState({ score: 0, strength: 'very weak' });
 
   const encrypt = (data = '', encryptionKey = '') => {
     const initializationVector = WordArray.random(16);
@@ -75,11 +77,15 @@ function PasswordForm({ navigation }) {
 
     return {
       score,
-      strength: score < 2 ? 'weak' : score < 4 ? 'medium' : 'strong',
+      strength: score < 2 ? 'very weak' : score < 4 ? 'weak' : score <6 ? 'medium' :'strong',
     };
   };
 
-  const SECURE_STORE_KEY = 'encrypted_passwords';
+  const handlePasswordChange = (newPassword) => {
+    setPassword(newPassword);
+    const str = checkPasswordStrength(newPassword);
+    setStrength(str);
+  };
 
   interface PasswordData {
     id?: number;
@@ -104,45 +110,39 @@ function PasswordForm({ navigation }) {
         const encryptedEncryptionKey = encrypt(encryptionkey, MasterPassword);
         
         const passwordData: PasswordData = {
-          id: passwords.length+1,
           userId: currentUser.uid,
           website,
           username,
           encryptedpassword,
           encryptedEncryptionKey
         };
+        let savedPasswordData = passwordData;
 
-        if(isSyncEnabled){
+        if (isSyncEnabled && (await NetInfo.fetch()).isConnected) {
           // Save to Firestore
           const passwordsRef = collection(Firebase_DB, "passwords");
           const docRef = await addDoc(passwordsRef, passwordData);
-          const savedPasswordData = { ...passwordData, id: docRef.id };
+          savedPasswordData = { ...passwordData, id: docRef.id };
+          console.log(passwordsRef);
+        } else {
+          // Generate local ID if offline
+          savedPasswordData = { ...passwordData, id: uuid.v4(), pendingSync: true };
         }
-        // console.log(passwordData);
         
         // Save to SecureStore
-        await saveToSecureStore(passwordData);
+        await saveToSecureStore(savedPasswordData);
   
         // Update local state
-        setPasswords(prevPasswords => [...prevPasswords, passwordData]);
+        setPasswords(prevPasswords => [...prevPasswords, savedPasswordData]);
   
-        // Show success message
         Alert.alert("Success", "Password saved successfully");
-  
-        // Navigate back
         navigation.goBack();
       } catch (error) {
         console.error("Error saving password:", error);
-        Alert.alert(
-          "Error",
-          "Failed to save password. Please try again."
-        );
+        Alert.alert("Error", "Failed to save password. Please try again.");
       }
     } else {
-      Alert.alert(
-        "Validation Error",
-        "Please fill in all fields (website, username, and password)"
-      );
+      Alert.alert("Validation Error", "Please fill in all fields");
     }
   };
   
@@ -158,7 +158,7 @@ const saveToSecureStore = async (newPassword: PasswordData) => {
 
     // Save back to SecureStore
     await SecureStore.setItemAsync(SECURE_STORE_KEY, JSON.stringify(passwords));
-    console.log(passwords);
+    // console.log(passwords);
   } catch (error) {
     console.error("Error saving to SecureStore:", error);
     throw error;
@@ -168,32 +168,12 @@ const saveToSecureStore = async (newPassword: PasswordData) => {
 // Fetch passwords from both stores and sync them
 const fetchPasswords = async () => {
   try {
-    // const currentUser = Firebase_Auth.currentUser;
-    // if (!currentUser) {
-    //   return;
-    // }
-
-    // // Fetch from Firestore
-    // const passwordsRef = collection(Firebase_DB, "passwords");
-    // const q = query(passwordsRef, where("userId", "==", currentUser.uid));
-    // const querySnapshot = await getDocs(q);
-    
-    // const firestorePasswords = querySnapshot.docs.map(doc => ({
-    //   id: doc.id,
-    //   ...doc.data()
-    // })) as PasswordData[];
-
     // Fetch from SecureStore
     const secureStoreData = await SecureStore.getItemAsync(SECURE_STORE_KEY);
     const secureStorePasswords = secureStoreData ? JSON.parse(secureStoreData) as PasswordData[] : [];
      
     setPasswords(secureStorePasswords);
-    console.log(secureStorePasswords);
-    // // Sync passwords
-    // await syncPasswords(firestorePasswords, secureStorePasswords);
-
-    // // Update local state with Firestore data
-    // setPasswords(firestorePasswords);
+ 
   } catch (error) {
     console.error("Error fetching passwords:", error);
     Alert.alert(
@@ -214,54 +194,6 @@ const syncPasswords = async (firestorePasswords: PasswordData[], secureStorePass
   }
 };
 
-// Delete password from both stores
-const deletePassword = async (passwordId: string) => {
-  try {
-    // const currentUser = Firebase_Auth.currentUser;
-    // if (!currentUser) {
-    //   return;
-    // }
-
-    // // Delete from Firestore
-    // await deleteDoc(doc(Firebase_DB, "passwords", passwordId));
-
-    // Delete from SecureStore
-    const secureStoreData = await SecureStore.getItemAsync(SECURE_STORE_KEY);
-    if (secureStoreData) {
-      const passwords = JSON.parse(secureStoreData) as PasswordData[];
-      const updatedPasswords = passwords.filter(p => p.id !== passwordId);
-      await SecureStore.setItemAsync(SECURE_STORE_KEY, JSON.stringify(updatedPasswords));
-    }
-
-    // Update local state
-    setPasswords(prevPasswords => prevPasswords.filter(p => p.id !== passwordId));
-
-    Alert.alert("Success", "Password deleted successfully");
-  } catch (error) {
-    console.error("Error deleting password:", error);
-    Alert.alert("Error", "Failed to delete password. Please try again.");
-  }
-};
-
-// Check for offline changes and sync when coming online
-const checkAndSyncOfflineChanges = async () => {
-  try {
-    const currentUser = Firebase_Auth.currentUser;
-    if (!currentUser) {
-      return;
-    }
-
-    const secureStoreData = await SecureStore.getItemAsync(SECURE_STORE_KEY);
-    if (!secureStoreData) {
-      return;
-    }
-
-    await fetchPasswords(); // This will handle the sync
-  } catch (error) {
-    console.error("Error checking offline changes:", error);
-  }
-};
-
 // Add this to your component's useEffect
 useEffect(() => {
   const fetchPasswordsAsync = async () => {
@@ -269,17 +201,6 @@ useEffect(() => {
   };
 
   fetchPasswordsAsync();
-  
-  // Optional: Set up network status listener to sync when coming online
-  const unsubscribe = NetInfo.addEventListener(state => {
-    if (state.isConnected) {
-      checkAndSyncOfflineChanges();
-    }
-  });
-
-  return () => {
-    unsubscribe();
-  };
 }, [500]); // Empty dependency array means this runs once on mount
 
 
@@ -314,7 +235,7 @@ useEffect(() => {
             style={[styles.input, { flex: 1 }]}
             placeholder="Password"
             value={password}
-            onChangeText={setPassword}
+            onChangeText={handlePasswordChange}
             secureTextEntry
           />
           <TouchableOpacity
@@ -324,8 +245,8 @@ useEffect(() => {
             <Text style={styles.generateButtonText}>Generate</Text>
           </TouchableOpacity>
         </View>
-        <Text style={[styles.passwordStrength, { color: passwordStrength.strength === 'weak' ? 'red' : passwordStrength.strength === 'medium' ? 'orange' : 'green' }]}>
-          Password Strength: {passwordStrength.strength}
+        <Text style={[styles.passwordStrength, { color: strength.strength === 'very weak' ? 'red' : strength.strength === 'weak'? 'crimson' : strength.strength === 'medium' ? 'orange' : 'green' }]}>
+          Password Strength: {strength.strength}
         </Text>
         <TouchableOpacity
           style={styles.submitButton}

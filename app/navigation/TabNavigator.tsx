@@ -3,6 +3,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import PasswordList from '../screens/PasswordList';
 import Settings from '../screens/Settings';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const Tab = createBottomTabNavigator();
 
@@ -11,11 +12,11 @@ export default function TabNavigator() {
 
 <Tab.Navigator
   screenOptions={{
-    headerLargeTitle: false, // Disable large titles
+    headerLargeTitle: true, // Disable large titles
     headerTitleAlign: 'center', // Center-align the title
     tabBarActiveTintColor: '#007AFF',
     tabBarInactiveTintColor: '#8E8E93',
-    tabBarStyle: { paddingBottom: 6, height: 60 },
+    tabBarStyle: { paddingBottom: useSafeAreaInsets().right, height: 60 },
     headerStyle: {
       backgroundColor: '#f8f8f8',
       height: 80, // Adjust this value to reduce the header height
