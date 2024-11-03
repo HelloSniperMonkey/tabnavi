@@ -13,13 +13,15 @@
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.soumyajyoti.tabnavi"
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
-      }
+      },
+      "package": "com.soumyajyoti.tabnavi"
     },
     "web": {
       "bundler": "metro",
@@ -31,6 +33,11 @@
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "eas": {
+        "projectId": "c3b9e34d-2f7a-4648-b48b-023eeb9c889f"
+      }
     }
   }
 }

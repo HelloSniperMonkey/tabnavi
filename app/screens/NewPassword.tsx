@@ -3,17 +3,17 @@ import Utf8 from 'crypto-js/enc-utf8';
 import Hex from 'crypto-js/enc-hex';
 import WordArray from 'crypto-js/lib-typedarrays';
 import CryptoJS from 'crypto-js';
-import React, { useState , useEffect } from "react";
-import { View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet , Alert } from "react-native";
+import React, { useState, useEffect } from "react";
+import { View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet, Alert } from "react-native";
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { usePassword, useKey } from '../components/PasswordContext';
 import uuid from 'react-native-uuid';
-import * as SecureStore from 'expo-secure-store';
 import { Firebase_Auth, Firebase_DB } from "../../FirebaseConfig";
 import { collection, addDoc, getDocs, query, where } from "firebase/firestore";
 import NetInfo from "@react-native-community/netinfo";
 
 function PasswordForm({ navigation }) {
-  const {SECURE_STORE_KEY , MasterPassword} = useKey();
+  const {SECURE_STORE_KEY, MasterPassword} = useKey();
   const { passwords, setPasswords } = usePassword();
   const [website, setWebsite] = useState('');
   const [username, setUsername] = useState('');
@@ -23,14 +23,13 @@ function PasswordForm({ navigation }) {
 
   const encrypt = (data = '', encryptionKey = '') => {
     const initializationVector = WordArray.random(16);
-  
-    // Encrypt the data
-    const encrypted = AES.encrypt(data, Utf8.parse(encryptionKey), {
+
+    const encrypted = AES.encrypt(data, encryptionKey, {
       iv: initializationVector,
       mode: CryptoJS.mode.CBC,
       padding: CryptoJS.pad.Pkcs7,
     });
-  
+
     return `${initializationVector.toString(Hex)}:${encrypted.toString()}`;
   };
 
@@ -65,11 +64,9 @@ function PasswordForm({ navigation }) {
   const checkPasswordStrength = (password) => {
     let score = 0;
 
-    // Length check
     if (password.length >= 12) score += 2;
     else if (password.length >= 8) score += 1;
 
-    // Character variety
     if (/[A-Z]/.test(password)) score += 1;
     if (/[a-z]/.test(password)) score += 1;
     if (/[0-9]/.test(password)) score += 1;
@@ -77,7 +74,7 @@ function PasswordForm({ navigation }) {
 
     return {
       score,
-      strength: score < 2 ? 'very weak' : score < 4 ? 'weak' : score <6 ? 'medium' :'strong',
+      strength: score < 2 ? 'very weak' : score < 4 ? 'weak' : score < 6 ? 'medium' : 'strong',
     };
   };
 
@@ -119,20 +116,14 @@ function PasswordForm({ navigation }) {
         let savedPasswordData = passwordData;
 
         if (isSyncEnabled && (await NetInfo.fetch()).isConnected) {
-          // Save to Firestore
           const passwordsRef = collection(Firebase_DB, "passwords");
           const docRef = await addDoc(passwordsRef, passwordData);
           savedPasswordData = { ...passwordData, id: docRef.id };
-          console.log(passwordsRef);
         } else {
-          // Generate local ID if offline
           savedPasswordData = { ...passwordData, id: uuid.v4(), pendingSync: true };
         }
         
-        // Save to SecureStore
-        await saveToSecureStore(savedPasswordData);
-  
-        // Update local state
+        await saveToAsyncStorage(savedPasswordData);
         setPasswords(prevPasswords => [...prevPasswords, savedPasswordData]);
   
         Alert.alert("Success", "Password saved successfully");
@@ -146,63 +137,45 @@ function PasswordForm({ navigation }) {
     }
   };
   
-  // Save to SecureStore
-const saveToSecureStore = async (newPassword: PasswordData) => {
-  try {
-    // Get existing passwords
-    const existingData = await SecureStore.getItemAsync(SECURE_STORE_KEY);
-    let passwords = existingData ? JSON.parse(existingData) : [];
-
-    // Add new password
-    passwords.push(newPassword);
-
-    // Save back to SecureStore
-    await SecureStore.setItemAsync(SECURE_STORE_KEY, JSON.stringify(passwords));
-    // console.log(passwords);
-  } catch (error) {
-    console.error("Error saving to SecureStore:", error);
-    throw error;
-  }
-};
-
-// Fetch passwords from both stores and sync them
-const fetchPasswords = async () => {
-  try {
-    // Fetch from SecureStore
-    const secureStoreData = await SecureStore.getItemAsync(SECURE_STORE_KEY);
-    const secureStorePasswords = secureStoreData ? JSON.parse(secureStoreData) as PasswordData[] : [];
-     
-    setPasswords(secureStorePasswords);
- 
-  } catch (error) {
-    console.error("Error fetching passwords:", error);
-    Alert.alert(
-      "Error",
-      "Failed to fetch passwords. Please try again."
-    );
-  }
-};
-
-// Sync passwords between Firestore and SecureStore
-const syncPasswords = async (firestorePasswords: PasswordData[], secureStorePasswords: PasswordData[]) => {
-  try {
-    // Use Firestore as source of truth
-    await SecureStore.setItemAsync(SECURE_STORE_KEY, JSON.stringify(firestorePasswords));
-  } catch (error) {
-    console.error("Error syncing passwords:", error);
-    throw error;
-  }
-};
-
-// Add this to your component's useEffect
-useEffect(() => {
-  const fetchPasswordsAsync = async () => {
-    await fetchPasswords();
+  const saveToAsyncStorage = async (newPassword: PasswordData) => {
+    try {
+      const existingData = await AsyncStorage.getItem(SECURE_STORE_KEY);
+      let passwords = existingData ? JSON.parse(existingData) : [];
+      passwords.push(newPassword);
+      await AsyncStorage.setItem(SECURE_STORE_KEY, JSON.stringify(passwords));
+    } catch (error) {
+      console.error("Error saving to AsyncStorage:", error);
+      throw error;
+    }
   };
 
-  fetchPasswordsAsync();
-}, [500]); // Empty dependency array means this runs once on mount
+  const fetchPasswords = async () => {
+    try {
+      const asyncStoreData = await AsyncStorage.getItem(SECURE_STORE_KEY);
+      const asyncStorePasswords = asyncStoreData ? JSON.parse(asyncStoreData) as PasswordData[] : [];
+      setPasswords(asyncStorePasswords);
+    } catch (error) {
+      console.error("Error fetching passwords:", error);
+      Alert.alert("Error", "Failed to fetch passwords. Please try again.");
+    }
+  };
 
+  const syncPasswords = async (firestorePasswords: PasswordData[], asyncStorePasswords: PasswordData[]) => {
+    try {
+      await AsyncStorage.setItem(SECURE_STORE_KEY, JSON.stringify(firestorePasswords));
+    } catch (error) {
+      console.error("Error syncing passwords:", error);
+      throw error;
+    }
+  };
+
+  useEffect(() => {
+    const fetchPasswordsAsync = async () => {
+      await fetchPasswords();
+    };
+
+    fetchPasswordsAsync();
+  }, [500]);
 
   const [generatedPassword, setGeneratedPassword] = useState('');
   const [passwordStrength, setPasswordStrength] = useState({ score: 0, strength: 'weak', suggestions: [] });
@@ -245,7 +218,7 @@ useEffect(() => {
             <Text style={styles.generateButtonText}>Generate</Text>
           </TouchableOpacity>
         </View>
-        <Text style={[styles.passwordStrength, { color: strength.strength === 'very weak' ? 'red' : strength.strength === 'weak'? 'crimson' : strength.strength === 'medium' ? 'orange' : 'green' }]}>
+        <Text style={[styles.passwordStrength, { color: strength.strength === 'very weak' ? 'red' : strength.strength === 'weak' ? 'crimson' : strength.strength === 'medium' ? 'orange' : 'green' }]}>
           Password Strength: {strength.strength}
         </Text>
         <TouchableOpacity
@@ -262,130 +235,134 @@ useEffect(() => {
 export default PasswordForm;
 
 export const styles = StyleSheet.create({
-  // ... [styles remain exactly the same as in your original code]
+  // Styles remain the same
   container: {
-      flex: 1,
-      padding: 20,
-      backgroundColor: '#f4f6f9',
+    flex: 1,
+    padding: 20,
+    backgroundColor: '#f4f6f9',
   },
   content: {
-      alignItems: 'center',
-      paddingVertical: 20,
+    alignItems: 'center',
+    paddingVertical: 20,
   },
   heading: {
-      fontSize: 26,
-      fontWeight: 'bold',
-      color: '#333',
-      marginBottom: 10,
+    fontSize: 26,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 10,
   },
   subHeading: {
-      fontSize: 18,
-      fontWeight: '600',
-      color: '#666',
-      marginBottom: 15,
-      textAlign: 'center',
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#666',
+    marginBottom: 15,
+    textAlign: 'center',
   },
   table: {
-      width: '100%',
-      marginVertical: 10,
+    width: '100%',
+    marginVertical: 10,
   },
   noData: {
-      fontSize: 16,
-      color: '#999',
-      textAlign: 'center',
-      marginVertical: 20,
+    fontSize: 16,
+    color: '#999',
+    textAlign: 'center',
+    marginVertical: 20,
   },
   passwordItem: {
-      backgroundColor: '#fff',
-      borderRadius: 8,
-      padding: 15,
-      marginBottom: 10,
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.1,
-      shadowRadius: 8,
-      elevation: 2,
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    padding: 15,
+    marginBottom: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 2,
   },
   listItem: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      marginBottom: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 10,
   },
   listLabel: {
-      fontSize: 16,
-      fontWeight: '500',
-      color: '#555',
-      width: '25%',
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#555',
+    width: '25%',
   },
   listValue: {
-      fontSize: 16,
-      color: '#333',
-      flex: 1,
+    fontSize: 16,
+    color: '#333',
+    flex: 1,
   },
   copyIcon: {
-      marginLeft: 8,
+    marginLeft: 8,
   },
   buttonsContainer: {
-      flexDirection: 'row',
-      justifyContent: 'space-around',
-      marginTop: 10,
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    marginTop: 10,
   },
   editButton: {
-      backgroundColor: '#4caf50',
-      borderRadius: 5,
-      padding: 8,
-      marginRight: 10,
-      alignItems: 'center',
+    backgroundColor: '#4caf50',
+    borderRadius: 5,
+    padding: 8,
+    marginRight: 10,
+    alignItems: 'center',
   },
   deleteButton: {
-      backgroundColor: '#e53935',
-      borderRadius: 5,
-      padding: 8,
-      alignItems: 'center',
+    backgroundColor: '#e53935',
+    borderRadius: 5,
+    padding: 8,
+    alignItems: 'center',
   },
   input: {
-      width: '100%',
-      height: 45,
-      borderRadius: 8,
-      borderColor: '#ddd',
-      borderWidth: 1,
-      paddingLeft: 10,
-      marginBottom: 12,
-      fontSize: 16,
-      color: '#333',
-      backgroundColor: '#fff',
+    width: '100%',
+    height: 45,
+    borderRadius: 8,
+    borderColor: '#ddd',
+    borderWidth: 1,
+    paddingLeft: 10,
+    marginBottom: 12,
+    fontSize: 16,
+    color: '#333',
+    backgroundColor: '#fff',
   },
   submitButton: {
-      backgroundColor: '#1976d2',
-      borderRadius: 8,
-      paddingVertical: 12,
-      paddingHorizontal: 20,
-      alignItems: 'center',
-      width: '100%',
-      marginTop: 10,
+    backgroundColor: '#1976d2',
+    borderRadius: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    alignItems: 'center',
+    width: '100%',
+    marginTop: 10,
   },
   submitButtonText: {
-      fontSize: 18,
-      color: '#fff',
-      fontWeight: '600',
+    fontSize: 18,
+    color: '#fff',
+    fontWeight: '600',
   },
   alert: {
-      fontSize: 14,
-      color: '#1976d2',
-      marginLeft: 5,
+    fontSize: 14,
+    color: '#1976d2',
+    marginLeft: 5,
   },
   generateButton: {
-      backgroundColor: '#1976d2',
-      borderRadius: 8,
-      paddingVertical: 12,
-      paddingHorizontal: 20,
-      alignItems: 'center',
-      width: '35%',
-      marginBottom: 12,
+    backgroundColor: '#1976d2',
+    borderRadius: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    alignItems: 'center',
+    width: '35%',
+    marginBottom: 12,
   },
   generateButtonText: {
     fontSize: 16,
-      color: '#fff',
-      fontWeight: '600',
+    color: '#fff',
+    fontWeight: '600',
+  },
+  passwordStrength: {
+    marginBottom: 10,
+    fontSize: 14,
   }
 });

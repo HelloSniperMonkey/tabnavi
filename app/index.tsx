@@ -8,6 +8,7 @@ import { useState, useEffect } from 'react';
 import { User } from 'firebase/auth';
 import { View, Text } from 'react-native';
 import Login from './screens/Login';
+import { AuthProvider } from './components/AuthContext';
 
 const RootStack = createNativeStackNavigator();
 
@@ -36,15 +37,17 @@ export default function Index() {
   return (
     <KeyProvider>
       <PasswordProvider>
-        <NavigationContainer independent={true}>
-          <RootStack.Navigator initialRouteName='Login'>
-            {user ? (
-              <RootStack.Screen name="PasswordList" component={MainStack} options={{ headerShown: false }} />
-            ) : (
-              <RootStack.Screen name="Login" component={Login} options={{ headerShown: false }} />
-            )}
-          </RootStack.Navigator>
-        </NavigationContainer>
+        <AuthProvider>
+          <NavigationContainer independent={true}>
+            <RootStack.Navigator initialRouteName='Login'>
+              {user ? (
+                <RootStack.Screen name="PasswordList" component={MainStack} options={{ headerShown: false }} />
+              ) : (
+                <RootStack.Screen name="Login" component={Login} options={{ headerShown: false }} />
+              )}
+            </RootStack.Navigator>
+          </NavigationContainer>
+        </AuthProvider>
       </PasswordProvider>
     </KeyProvider>
   );

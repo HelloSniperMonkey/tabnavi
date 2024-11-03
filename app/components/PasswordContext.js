@@ -1,19 +1,19 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
-import * as SecureStore from 'expo-secure-store';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Create the Key Context
 const KeyContext = createContext();
 
 export const KeyProvider = ({children}) => {
-    const [MasterPassword, setMasterPassword] = useState('hellomyappisgood');
-    const [SECURE_STORE_KEY, setSECURE_STORE_KEY] = useState('internal-storage-encrypted-passwords');
-    const [BREACH_RESULTS_KEY, setBREACH_RESULTS_KEY] = useState('breach-results-stored-in-my-app');
+    const [MasterPassword, setMasterPassword] = useState('plzwork');
+    const [SECURE_STORE_KEY, setSECURE_STORE_KEY] = useState('plzwork');
+    const [BREACH_RESULTS_KEY, setBREACH_RESULTS_KEY] = useState('plzwork');
 
     // Add clearKeys function
     const clearKeys = () => {
-        setMasterPassword('hellomyappisgood');
-        setSECURE_STORE_KEY('internal-storage-encrypted-passwords');
-        setBREACH_RESULTS_KEY('breach-results-stored-in-my-app');
+        setMasterPassword('plzwork');
+        setSECURE_STORE_KEY('plzwork');
+        setBREACH_RESULTS_KEY('plzwork');
     };
 
     return (
@@ -56,13 +56,12 @@ export const PasswordProvider = ({ children }) => {
     const loadData = async () => {
         try {
             // Load passwords
-            const secureStoreData = await SecureStore.getItemAsync(SECURE_STORE_KEY);
-            const secureStorePasswords = secureStoreData ? JSON.parse(secureStoreData) : [];
-            setPasswords(secureStorePasswords);
-            console.log(secureStoreData);
-            console.log(secureStorePasswords);
+            const asyncStoreData = await AsyncStorage.getItem(SECURE_STORE_KEY);
+            const asyncStorePasswords = asyncStoreData ? JSON.parse(asyncStoreData) : [];
+            setPasswords(asyncStorePasswords);
+            
             // Load breach results
-            const savedBreachResults = await SecureStore.getItemAsync(BREACH_RESULTS_KEY);
+            const savedBreachResults = await AsyncStorage.getItem(BREACH_RESULTS_KEY);
             if (savedBreachResults) {
                 setBreachResults(JSON.parse(savedBreachResults));
             } else {
@@ -78,8 +77,8 @@ export const PasswordProvider = ({ children }) => {
 
     const clearPasswords = async () => {
         try {
-            // await SecureStore.deleteItemAsync(SECURE_STORE_KEY);
-            // await SecureStore.deleteItemAsync(BREACH_RESULTS_KEY);
+            // await AsyncStorage.removeItem(SECURE_STORE_KEY);
+            // await AsyncStorage.removeItem(BREACH_RESULTS_KEY);
             setPasswords([]);
             setBreachResults([]);
         } catch (error) {
@@ -89,7 +88,7 @@ export const PasswordProvider = ({ children }) => {
 
     const updateBreachResults = async (newResults) => {
         try {
-            await SecureStore.setItemAsync(BREACH_RESULTS_KEY, JSON.stringify(newResults));
+            await AsyncStorage.setItem(BREACH_RESULTS_KEY, JSON.stringify(newResults));
             setBreachResults(newResults);
         } catch (error) {
             console.error("Error saving breach results:", error);

@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { Text, View, FlatList, StyleSheet, TouchableOpacity, Alert, Clipboard } from "react-native";
-import { ListItem, Icon, Button } from '@rneui/themed';
+import { ListItem, Icon } from '@rneui/themed';
 import { usePassword, useKey } from './PasswordContext';
-import * as SecureStore from 'expo-secure-store';
-import { checkDataBreaches, BreachResult } from './DataBreach';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { checkDataBreaches } from './DataBreach';
 
 import AES from 'crypto-js/aes';
 import Utf8 from 'crypto-js/enc-utf8';
@@ -15,7 +15,7 @@ const LAST_BREACH_CHECK_KEY = 'last_breach_check';
 
 export default function List() {
   const {BREACH_RESULTS_KEY, MasterPassword, SECURE_STORE_KEY} = useKey();
-  const { passwords, setPasswords ,breachResults , updateBreachResults , loadData} = usePassword();
+  const { passwords, setPasswords, breachResults, updateBreachResults, loadData } = usePassword();
   const [expandedItems, setExpandedItems] = useState({});
   const [hide, setHide] = useState({});
 
@@ -26,23 +26,21 @@ export default function List() {
 
   const decrypt = (encryptedData = '', encryptionKey = '') => {
     const [ivHex, encryptedText] = encryptedData.split(':');
-
     const iv = Hex.parse(ivHex);
-
-    // Decrypt the encrypted text
-    const decrypted = AES.decrypt(encryptedText, Utf8.parse(encryptionKey), {
+  
+    const decrypted = AES.decrypt(encryptedText, encryptionKey, {
       iv: iv,
       mode: CryptoJS.mode.CBC,
       padding: CryptoJS.pad.Pkcs7,
     });
-
-    return decrypted.toString(Utf8);
+    const decryptedText = decrypted.toString(Utf8);
+    return decryptedText;
   };
 
   const checkForBreaches = async () => {
     try {
       // Check if it's time to run breach check
-      const lastCheck = await SecureStore.getItemAsync(LAST_BREACH_CHECK_KEY);
+      const lastCheck = await AsyncStorage.getItem(LAST_BREACH_CHECK_KEY);
       const lastCheckTime = lastCheck ? parseInt(lastCheck) : 0;
       const now = Date.now();
 
@@ -52,8 +50,8 @@ export default function List() {
         updateBreachResults(results);
 
         // Save results and update last check time
-        await SecureStore.setItemAsync(BREACH_RESULTS_KEY, JSON.stringify(results));
-        await SecureStore.setItemAsync(LAST_BREACH_CHECK_KEY, now.toString());
+        await AsyncStorage.setItem(BREACH_RESULTS_KEY, JSON.stringify(results));
+        await AsyncStorage.setItem(LAST_BREACH_CHECK_KEY, now.toString());
 
         // Notify user of any breaches
         const newBreaches = results.filter(result => result.isBreached);
@@ -66,7 +64,7 @@ export default function List() {
         }
       } else {
         // Load previous results
-        const savedResults = await SecureStore.getItemAsync(BREACH_RESULTS_KEY);
+        const savedResults = await AsyncStorage.getItem(BREACH_RESULTS_KEY);
         if (savedResults) {
           updateBreachResults(JSON.parse(savedResults));
         }
@@ -97,6 +95,7 @@ export default function List() {
   };
 
   useEffect(() => {
+    console.log(MasterPassword);
     setExpandedItems({});
     setHide({});
     checkForBreaches();
@@ -138,13 +137,13 @@ export default function List() {
             try {
               const newPasswords = passwords.filter((_, i) => i !== index);
               
-              // Remove the password from SecureStore
-              const secureStoreData = await SecureStore.getItemAsync(SECURE_STORE_KEY);
-              if (secureStoreData) {
-                const storedPasswords = JSON.parse(secureStoreData);
+              // Remove the password from AsyncStorage
+              const storedData = await AsyncStorage.getItem(SECURE_STORE_KEY);
+              if (storedData) {
+                const storedPasswords = JSON.parse(storedData);
                 const updatedPasswords = storedPasswords.filter((_, i) => i !== index);
                 console.log(updatedPasswords);
-                await SecureStore.setItemAsync(SECURE_STORE_KEY, JSON.stringify(updatedPasswords));
+                await AsyncStorage.setItem(SECURE_STORE_KEY, JSON.stringify(updatedPasswords));
               }
   
               setPasswords(newPasswords);
@@ -157,12 +156,10 @@ export default function List() {
       ]
     );
   };
-  
 
+  // Rest of the component remains the same
   return (
     <View style={styles.container}>
-      <Text style={styles.header}>My Vault</Text>
-
       {passwords.length === 0 ? (
         <Text style={styles.emptyText}>Nothing to show here. Add something.</Text>
       ) : (
@@ -256,6 +253,7 @@ export default function List() {
 }
 
 const styles = StyleSheet.create({
+  // Styles remain unchanged
   container: {
     flex: 1,
     backgroundColor: "#f7f7f7",

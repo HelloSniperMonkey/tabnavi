@@ -5,8 +5,9 @@ import { signOut } from "firebase/auth";
 import { Firebase_Auth } from "../../FirebaseConfig";
 import { useNavigation } from "@react-navigation/native";
 import { useKey, usePassword } from '../components/PasswordContext';
+import { useAuth } from '../components/AuthContext'
 import { checkDataBreaches } from '../components/DataBreach';
-import * as SecureStore from 'expo-secure-store';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const LAST_BREACH_CHECK_KEY = 'last_breach_check';
 
@@ -16,13 +17,14 @@ export default function Index() {
   const navigation = useNavigation();
   const { passwords, updateBreachResults , clearPasswords} = usePassword();
   const { clearKeys } = useKey();
+  const { clearAuthKeys } = useAuth();
 
   const toggleSwitch = () => setIsSyncEnabled(previousState => !previousState);
 
   const Logout = async () => {
     try {
         setIsLoading(true);
-        
+        await clearAuthKeys();
         await clearPasswords(); // Clear stored passwords
         clearKeys(); // Reset keys to default
         await signOut(Firebase_Auth);
@@ -46,7 +48,7 @@ export default function Index() {
         await updateBreachResults(results);
         
         // Save last check time
-        await SecureStore.setItemAsync(LAST_BREACH_CHECK_KEY, Date.now().toString());
+        await AsyncStorage.setItem(LAST_BREACH_CHECK_KEY, Date.now().toString());
 
         // Notify user of breaches
         const newBreaches = results.filter(result => result.isBreached);

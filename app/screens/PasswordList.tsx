@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Icon } from '@rneui/themed';
 import List from '../components/List';
@@ -9,6 +9,8 @@ export default function PasswordList() {
 
   return (
     <View style={styles.container}>
+      <Text style={styles.header}>My Vault</Text>
+      
       <List />
       <TouchableOpacity
         style={styles.addButton}
@@ -23,6 +25,14 @@ export default function PasswordList() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  header: {
+    fontSize: 24,
+    fontWeight: "bold",
+    color: "#333",
+    marginTop: 10,
+    marginBottom: 10,
+    paddingHorizontal: 16,
   },
   addButton: {
     position: 'absolute',
