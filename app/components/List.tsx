@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Text, View, FlatList, StyleSheet, TouchableOpacity, Alert, Clipboard } from "react-native";
+import { Text, View, FlatList, StyleSheet, TouchableOpacity, Alert, Clipboard, Modal, RefreshControl } from "react-native";
 import { ListItem, Icon } from '@rneui/themed';
 import { usePassword, useKey } from './PasswordContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -13,11 +13,13 @@ import CryptoJS from 'crypto-js';
 const BREACH_CHECK_INTERVAL = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
 const LAST_BREACH_CHECK_KEY = 'last_breach_check';
 
-export default function List() {
-  const {BREACH_RESULTS_KEY, MasterPassword, SECURE_STORE_KEY} = useKey();
+export default function List({ filter, filterText }) {
+  const { BREACH_RESULTS_KEY, MasterPassword, SECURE_STORE_KEY } = useKey();
   const { passwords, setPasswords, breachResults, updateBreachResults, loadData } = usePassword();
   const [expandedItems, setExpandedItems] = useState({});
   const [hide, setHide] = useState({});
+  const [modalVisible, setModalVisible] = useState(false);
+  const [selectedIndex, setSelectedIndex] = useState(null);
 
   const getBreachStatus = (username: string) => {
     const result = breachResults.find(r => r.email === username);
@@ -27,7 +29,7 @@ export default function List() {
   const decrypt = (encryptedData = '', encryptionKey = '') => {
     const [ivHex, encryptedText] = encryptedData.split(':');
     const iv = Hex.parse(ivHex);
-  
+
     const decrypted = AES.decrypt(encryptedText, encryptionKey, {
       iv: iv,
       mode: CryptoJS.mode.CBC,
@@ -94,6 +96,8 @@ export default function List() {
     };
   };
 
+  const [shouldReload, setShouldReload] = useState(0);
+
   useEffect(() => {
     console.log(MasterPassword);
     setExpandedItems({});
@@ -103,7 +107,7 @@ export default function List() {
       await loadData();
     }
     load();
-  }, [passwords.length]);
+  }, [shouldReload]);
 
   const toggleHide = (index) => {
     setHide((prev) => ({
@@ -136,7 +140,7 @@ export default function List() {
           onPress: async () => {
             try {
               const newPasswords = passwords.filter((_, i) => i !== index);
-              
+
               // Remove the password from AsyncStorage
               const storedData = await AsyncStorage.getItem(SECURE_STORE_KEY);
               if (storedData) {
@@ -145,8 +149,9 @@ export default function List() {
                 console.log(updatedPasswords);
                 await AsyncStorage.setItem(SECURE_STORE_KEY, JSON.stringify(updatedPasswords));
               }
-  
+
               setPasswords(newPasswords);
+              setShouldReload(prev => prev + 1);
             } catch (error) {
               console.error("Error deleting password:", error);
               Alert.alert("Error", "Failed to delete password. Please try again.");
@@ -157,22 +162,136 @@ export default function List() {
     );
   };
 
+  const TagSelectionModal = ({ visible, onClose, onSelectTag, index }) => {
+    const tags = [
+      { id: 'work', label: 'Work', icon: 'work' },
+      { id: 'banking', label: 'Banking', icon: 'account-balance' },
+      { id: 'social', label: 'Social', icon: 'people' }
+    ];
+
+    return (
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={visible}
+        onRequestClose={onClose}
+      >
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={onClose}
+        >
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Select Category</Text>
+            {tags.map((tag) => (
+              <TouchableOpacity
+                key={tag.id}
+                style={styles.tagOption}
+                onPress={() => {
+                  onSelectTag(index, tag.id);
+                  onClose();
+                }}
+              >
+                <Icon name={tag.icon} type="material" color="#007AFF" />
+                <Text style={styles.tagText}>{tag.label}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </TouchableOpacity>
+      </Modal>
+    );
+  };
+
+  const choseTag = (index) => {
+    setSelectedIndex(index);
+    setModalVisible(true);
+  };
+
+  const handleTagSelection = async (index, tag) => {
+    passwords[index]["tag"] = tag;
+    try {
+
+      const storedData = await AsyncStorage.getItem(SECURE_STORE_KEY);
+      if (storedData) {
+        const storedPasswords = JSON.parse(storedData);
+        console.log(passwords);
+        await AsyncStorage.setItem(SECURE_STORE_KEY, JSON.stringify(passwords));
+      }
+
+      console.log(`Setting tag ${tag} for item at index ${index}`);
+      setPasswords(passwords);
+      setShouldReload(prev => prev + 1);
+    } catch (error) {
+      console.error("Error setting tag for password:", error);
+      Alert.alert("Error", "Failed to give tag to password. Please try again.");
+    }
+  };
+
+  const filteredPasswords = passwords.filter(item => {
+    if (!filter && !filterText) return true; // If no filter, show all items
+    else if (!filterText) {
+      const searchLower = filter.toLowerCase();
+      return (
+        (item.tag && item.tag.toLowerCase().includes(searchLower))
+      );
+    }
+    else {
+      const searchLower = filterText.toLowerCase();
+      return (
+        (item.website && item.website.toLowerCase().includes(searchLower)) ||
+        (item.name && item.name.toLowerCase().includes(searchLower)) ||
+        (item.username && item.username.toLowerCase().includes(searchLower)) ||
+        (item.tag && item.tag.toLowerCase().includes(searchLower))
+      );
+    }
+  });
+  const [refreshing, setRefreshing] = React.useState(false);
+
+  const onRefresh = React.useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await loadData();
+      await checkForBreaches();
+    } catch (error) {
+      console.error("Error refreshing data:", error);
+    } finally {
+      setRefreshing(false);
+    }
+  }, []);
   // Rest of the component remains the same
   return (
     <View style={styles.container}>
-      {passwords.length === 0 ? (
-        <Text style={styles.emptyText}>Nothing to show here. Add something.</Text>
+      <TagSelectionModal
+        visible={modalVisible}
+        onClose={() => setModalVisible(false)}
+        onSelectTag={handleTagSelection}
+        index={selectedIndex}
+      />
+
+      {filteredPasswords.length === 0 ? (
+        <Text style={styles.emptyText}>
+          {filter ? "No matches found for your search." : "Nothing to show here. Add something."}
+        </Text>
       ) : (
         <FlatList
-          data={passwords}
+          data={filteredPasswords}
           keyExtractor={(item, index) => index.toString()}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+            />
+          }
           renderItem={({ item, index }) => {
             const securityStyles = getSecurityStyles(item.username);
             const isBreached = getBreachStatus(item.username);
 
             return (
               <View>
-                <TouchableOpacity onPress={() => toggleExpand(index)}>
+                <TouchableOpacity
+                  onPress={() => toggleExpand(index)}
+                  onLongPress={() => choseTag(index)}
+                >
                   <ListItem containerStyle={securityStyles.container} bottomDivider>
                     <ListItem.Content>
                       <View style={styles.titleContainer}>
@@ -187,6 +306,11 @@ export default function List() {
                             size={16}
                             style={styles.warningIcon}
                           />
+                        )}
+                        {item.tag && (
+                          <View style={styles.tagBadge}>
+                            <Text style={styles.tagText}>{item.tag}</Text>
+                          </View>
                         )}
                       </View>
                       <ListItem.Subtitle style={securityStyles.subtitle}>
@@ -253,8 +377,8 @@ export default function List() {
 }
 
 const styles = StyleSheet.create({
-  // Styles remain unchanged
   container: {
+    paddingTop: 5,
     flex: 1,
     backgroundColor: "#f7f7f7",
     paddingHorizontal: 16,
@@ -334,4 +458,45 @@ const styles = StyleSheet.create({
   warningIcon: {
     marginLeft: 8,
   },
+  modalOverlay: {
+    flex: 1,
+    animation: 'fade',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: 'white',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 20,
+    minHeight: 200,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginBottom: 20,
+    textAlign: 'center',
+  },
+  tagOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
+  tagText: {
+    fontSize: 16,
+    marginLeft: 0,
+  },
+  tagBadge: {
+    backgroundColor: '#e8e8e8',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 12,
+    marginLeft: 8,
+  },
+  tagBadgeText: {
+    fontSize: 12,
+    color: '#666',
+  }
 });

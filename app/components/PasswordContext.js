@@ -5,15 +5,15 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 const KeyContext = createContext();
 
 export const KeyProvider = ({children}) => {
-    const [MasterPassword, setMasterPassword] = useState('plzwork');
-    const [SECURE_STORE_KEY, setSECURE_STORE_KEY] = useState('plzwork');
-    const [BREACH_RESULTS_KEY, setBREACH_RESULTS_KEY] = useState('plzwork');
+    const [MasterPassword, setMasterPassword] = useState('plzworkMP');
+    const [SECURE_STORE_KEY, setSECURE_STORE_KEY] = useState('plzworkSS');
+    const [BREACH_RESULTS_KEY, setBREACH_RESULTS_KEY] = useState('plzworkBR');
 
     // Add clearKeys function
     const clearKeys = () => {
-        setMasterPassword('plzwork');
-        setSECURE_STORE_KEY('plzwork');
-        setBREACH_RESULTS_KEY('plzwork');
+        setMasterPassword('plzworkMP');
+        setSECURE_STORE_KEY('plzworkSS');
+        setBREACH_RESULTS_KEY('plzworkBR');
     };
 
     return (
@@ -60,6 +60,7 @@ export const PasswordProvider = ({ children }) => {
             const asyncStorePasswords = asyncStoreData ? JSON.parse(asyncStoreData) : [];
             setPasswords(asyncStorePasswords);
             
+            console.log(asyncStorePasswords)
             // Load breach results
             const savedBreachResults = await AsyncStorage.getItem(BREACH_RESULTS_KEY);
             if (savedBreachResults) {

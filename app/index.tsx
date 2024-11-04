@@ -38,7 +38,7 @@ export default function Index() {
     <KeyProvider>
       <PasswordProvider>
         <AuthProvider>
-          <NavigationContainer independent={true}>
+          <NavigationContainer screenOptions={{headerShown: false}} independent={true}>
             <RootStack.Navigator initialRouteName='Login'>
               {user ? (
                 <RootStack.Screen name="PasswordList" component={MainStack} options={{ headerShown: false }} />

@@ -34,9 +34,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const initializeAuthKeys = async (email: string) => {
     const processedEmail = email.split('@')[0] + email.split('@')[1];
     const keys: AuthKeys = {
-      secureStoreKey: processedEmail,
-      breachResultsKey: processedEmail,
-      masterPassword: processedEmail
+      secureStoreKey: processedEmail+"SS",
+      breachResultsKey: processedEmail+"BR",
+      masterPassword: processedEmail+"MP"
     };
     
     // Save keys to secure storage

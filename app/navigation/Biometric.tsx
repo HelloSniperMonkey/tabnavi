@@ -96,6 +96,7 @@ export default function MainStack() {
         name="NewPassword"
         component={NewPassword}
         options={{
+          headerShown: false ,
           presentation: 'modal',
           title: 'Add Password'
         }}

@@ -141,6 +141,7 @@ function PasswordForm({ navigation }) {
     try {
       const existingData = await AsyncStorage.getItem(SECURE_STORE_KEY);
       let passwords = existingData ? JSON.parse(existingData) : [];
+      // console.log(existingData);
       passwords.push(newPassword);
       await AsyncStorage.setItem(SECURE_STORE_KEY, JSON.stringify(passwords));
     } catch (error) {
