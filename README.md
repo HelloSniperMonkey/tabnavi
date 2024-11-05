@@ -9,9 +9,14 @@ A secure, cross-platform password management application built with React Native
 - **Password Generation**: Create strong, unique passwords with customizable parameters
 - **Smart Organization**: Categorize passwords into folders (banking, social, work, etc.)
 - **Enhanced Security**: Multi-factor authentication with biometric options
-- **Password Recovery**: Secure recovery mechanisms via email or backup codes
+- **Password Recovery**: Secure recovery mechanisms via email 
 - **Breach Monitoring**: Real-time alerts for compromised credentials
 - **Offline Access**: Secure access to encrypted passwords without internet connection
+
+<video width="720" height="1584" controls>
+  <source src="video.mov" type="video/mov">
+Your browser does not support the video tag.
+</video>
 
 ## 🛠 Tech Stack
 
