@@ -1,9 +1,12 @@
 # TabNavi Password Manager
-
 A secure, cross-platform password management application built with React Native. TabNavi provides robust password management features including secure storage, password generation, and data breach monitoring, all while ensuring your credentials remain safe both online and offline.
 
-## 🚀 Features
+## 📱 Demo
+![TabNavi Demo](./video.mov)
 
+> Note: If you want to see the full video demo, check out our [demo video](./video.mov) on Google Drive
+
+## 🚀 Features
 - **Secure Storage**: Military-grade encryption for local and cloud storage of passwords
 - **Cross-Platform**: Seamless experience across iOS and Android devices
 - **Password Generation**: Create strong, unique passwords with customizable parameters
@@ -13,26 +16,19 @@ A secure, cross-platform password management application built with React Native
 - **Breach Monitoring**: Real-time alerts for compromised credentials
 - **Offline Access**: Secure access to encrypted passwords without internet connection
 
-<video width="720" height="1584" controls>
-  <source src="video.mov" type="video/mov">
-Your browser does not support the video tag.
-</video>
-
 ## 🛠 Tech Stack
-
 - React Native
 - Expo
 - AsyncStorage
-- expo secure storage
+- Expo Secure Storage
 - React Native Keychain
 - React Navigation
-- expo loacl authentication (Biometrics)
+- Expo Local Authentication (Biometrics)
 - Crypto-js
 - Firebase
-- uuid
+- UUID
 
 ## 📋 Prerequisites
-
 Before running this project, make sure you have the following installed:
 - Node.js (v14.0.0 or later)
 - npm or yarn
@@ -41,7 +37,6 @@ Before running this project, make sure you have the following installed:
 - Xcode (for iOS development)
 
 ## 🔧 Installation
-
 1. Clone the repository:
 ```bash
 git clone https://github.com/HelloSniperMonkey/tabnavi.git
@@ -70,7 +65,6 @@ npm start
 ```
 
 ## 📱 Running on Devices
-
 ### iOS
 ```bash
 # Run on iOS simulator
@@ -90,14 +84,13 @@ tabnavi/
 │   ├── components/     # Reusable components
 │   ├── screens/        # App screens
 │   ├── navigation/     # Navigation configuration
-│   └── types/          # defining some constant for naviagtion
+│   └── types/          # Defining some constant for navigation
 ├── assets/            # Images and fonts
 ├── App.js            # Root component
 └── app.json          # Expo configuration
 ```
 
 ## 🔒 Security Features
-
 - AES-256 encryption for password storage
 - Secure key generation and management
 - Biometric authentication integration
@@ -106,7 +99,6 @@ tabnavi/
 - Secure clipboard copying
 
 ## 🤝 Contributing
-
 Contributions are welcome! Please feel free to submit a Pull Request.
 
 1. Fork the repository
@@ -116,12 +108,10 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 5. Open a Pull Request
 
 ## 👤 Author
-
 [HelloSniperMonkey](https://github.com/HelloSniperMonkey)  
 Maintained by [Soumyajyoti Mohanta](mailto:soumyajyotimohanta@gmail.com)
 
 ## 🙏 Acknowledgments
-
 - React Native community for mobile development resources
 - Expo team for development tools
 - Open source security libraries contributors
