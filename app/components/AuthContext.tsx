@@ -7,6 +7,7 @@ import { useKey } from './PasswordContext';
 const AUTH_KEYS_STORE_KEY = 'auth_keys';
 
 interface AuthKeys {
+  mail: string,
   secureStoreKey: string;
   breachResultsKey: string;
   masterPassword: string;
@@ -25,6 +26,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const { 
+    setMail,
     setMasterPassword, 
     setSECURE_STORE_KEY, 
     setBREACH_RESULTS_KEY,
@@ -34,6 +36,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const initializeAuthKeys = async (email: string) => {
     const processedEmail = email.split('@')[0] + email.split('@')[1];
     const keys: AuthKeys = {
+      mail: processedEmail ,
       secureStoreKey: processedEmail+"SS",
       breachResultsKey: processedEmail+"BR",
       masterPassword: processedEmail+"MP"
@@ -43,6 +46,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     await SecureStore.setItemAsync(AUTH_KEYS_STORE_KEY, JSON.stringify(keys));
     
     // Update context values
+    setMail(keys.mail);
     setSECURE_STORE_KEY(keys.secureStoreKey);
     setBREACH_RESULTS_KEY(keys.breachResultsKey);
     setMasterPassword(keys.masterPassword);
@@ -59,6 +63,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         const savedKeys = await SecureStore.getItemAsync(AUTH_KEYS_STORE_KEY);
         if (savedKeys) {
           const keys: AuthKeys = JSON.parse(savedKeys);
+          setMail(keys.mail);
           setSECURE_STORE_KEY(keys.secureStoreKey);
           setBREACH_RESULTS_KEY(keys.breachResultsKey);
           setMasterPassword(keys.masterPassword);

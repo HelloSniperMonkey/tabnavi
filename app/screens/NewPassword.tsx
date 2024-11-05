@@ -9,16 +9,16 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { usePassword, useKey } from '../components/PasswordContext';
 import uuid from 'react-native-uuid';
 import { Firebase_Auth, Firebase_DB } from "../../FirebaseConfig";
-import { collection, addDoc, getDocs, query, where } from "firebase/firestore";
+import { collection, addDoc, getDocs, query, where, Firestore } from "firebase/firestore";
 import NetInfo from "@react-native-community/netinfo";
 
 function PasswordForm({ navigation }) {
-  const {SECURE_STORE_KEY, MasterPassword} = useKey();
+  const { SECURE_STORE_KEY, MasterPassword, mail } = useKey();
   const { passwords, setPasswords } = usePassword();
   const [website, setWebsite] = useState('');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const [isSyncEnabled, setIsSyncEnabled] = useState(false);
+  const [isSyncEnabled, setIsSyncEnabled] = useState(true);
   const [strength, setStrength] = useState({ score: 0, strength: 'very weak' });
 
   const encrypt = (data = '', encryptionKey = '') => {
@@ -101,11 +101,11 @@ function PasswordForm({ navigation }) {
           Alert.alert("Error", "You must be logged in to save passwords");
           return;
         }
-  
+
         const encryptionkey = uuid.v4();
         const encryptedpassword = encrypt(password, encryptionkey);
         const encryptedEncryptionKey = encrypt(encryptionkey, MasterPassword);
-        
+
         const passwordData: PasswordData = {
           userId: currentUser.uid,
           website,
@@ -115,17 +115,17 @@ function PasswordForm({ navigation }) {
         };
         let savedPasswordData = passwordData;
 
-        if (isSyncEnabled && (await NetInfo.fetch()).isConnected) {
-          const passwordsRef = collection(Firebase_DB, "passwords");
+        if (isSyncEnabled) {
+          const passwordsRef = collection(Firebase_DB, `${mail as string}_passwords`);
           const docRef = await addDoc(passwordsRef, passwordData);
           savedPasswordData = { ...passwordData, id: docRef.id };
         } else {
           savedPasswordData = { ...passwordData, id: uuid.v4(), pendingSync: true };
         }
-        
+
         await saveToAsyncStorage(savedPasswordData);
         setPasswords(prevPasswords => [...prevPasswords, savedPasswordData]);
-  
+
         Alert.alert("Success", "Password saved successfully");
         navigation.goBack();
       } catch (error) {
@@ -136,7 +136,7 @@ function PasswordForm({ navigation }) {
       Alert.alert("Validation Error", "Please fill in all fields");
     }
   };
-  
+
   const saveToAsyncStorage = async (newPassword: PasswordData) => {
     try {
       const existingData = await AsyncStorage.getItem(SECURE_STORE_KEY);
@@ -152,22 +152,63 @@ function PasswordForm({ navigation }) {
 
   const fetchPasswords = async () => {
     try {
+      const ref = collection(Firebase_DB, `${mail}_passwords`);
+      const firestorePasswords = [];
+      if (isSyncEnabled) {
+        const snapshot = await getDocs(query(ref));
+        snapshot.forEach((doc) => {
+          let ob = doc.data();
+          firestorePasswords.push(ob);
+        });
+      }
+
       const asyncStoreData = await AsyncStorage.getItem(SECURE_STORE_KEY);
-      const asyncStorePasswords = asyncStoreData ? JSON.parse(asyncStoreData) as PasswordData[] : [];
-      setPasswords(asyncStorePasswords);
+      const localPasswords = asyncStoreData ? JSON.parse(asyncStoreData) as PasswordData[] : [];
+
+      const pendingPasswords = localPasswords.filter(p => p.pendingSync);
+      if (isSyncEnabled)
+        for (const password of pendingPasswords) {
+          const { pendingSync, id, ...passwordData } = password;
+          const docRef = await addDoc(ref, {
+            ...passwordData,
+            lastModified: Date.now()
+          });
+          password.id = docRef.id;
+          password.pendingSync = false;
+        }
+
+      const mergedPasswords = mergePasswords(localPasswords, firestorePasswords);
+      await AsyncStorage.setItem(SECURE_STORE_KEY, JSON.stringify(mergedPasswords));
+
+      setPasswords(mergedPasswords);
     } catch (error) {
       console.error("Error fetching passwords:", error);
       Alert.alert("Error", "Failed to fetch passwords. Please try again.");
     }
   };
 
-  const syncPasswords = async (firestorePasswords: PasswordData[], asyncStorePasswords: PasswordData[]) => {
-    try {
-      await AsyncStorage.setItem(SECURE_STORE_KEY, JSON.stringify(firestorePasswords));
-    } catch (error) {
-      console.error("Error syncing passwords:", error);
-      throw error;
-    }
+  const mergePasswords = (local: PasswordData[], cloud: PasswordData[]): PasswordData[] => {
+    const merged = new Map<string, PasswordData>();
+
+    // Add all local passwords to map
+    local.forEach(password => {
+      if (!password.pendingSync) {
+        merged.set(password.id!, password);
+      }
+    });
+    cloud.forEach(password => {
+      const existing = merged.get(password.id!);
+      if (!existing || (password.lastModified || 0) > (existing.lastModified || 0)) {
+        merged.set(password.id!, password);
+      }
+    });
+
+    // Add pending sync passwords
+    local.filter(p => p.pendingSync).forEach(password => {
+      merged.set(password.id!, password);
+    });
+
+    return Array.from(merged.values());
   };
 
   useEffect(() => {

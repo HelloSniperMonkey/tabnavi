@@ -5,12 +5,14 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 const KeyContext = createContext();
 
 export const KeyProvider = ({children}) => {
+    const [mail,setMail] = useState('xy');
     const [MasterPassword, setMasterPassword] = useState('plzworkMP');
     const [SECURE_STORE_KEY, setSECURE_STORE_KEY] = useState('plzworkSS');
     const [BREACH_RESULTS_KEY, setBREACH_RESULTS_KEY] = useState('plzworkBR');
 
     // Add clearKeys function
     const clearKeys = () => {
+        setMail('xy');
         setMasterPassword('plzworkMP');
         setSECURE_STORE_KEY('plzworkSS');
         setBREACH_RESULTS_KEY('plzworkBR');
@@ -19,6 +21,8 @@ export const KeyProvider = ({children}) => {
     return (
         <KeyContext.Provider 
             value={{ 
+                mail,
+                setMail,
                 MasterPassword, 
                 setMasterPassword,
                 SECURE_STORE_KEY, 

@@ -4,6 +4,8 @@ import { ListItem, Icon } from '@rneui/themed';
 import { usePassword, useKey } from './PasswordContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { checkDataBreaches } from './DataBreach';
+import { Firebase_DB } from "../../FirebaseConfig";
+import { collection, addDoc, getDocs, query, where, Firestore, deleteDoc , doc } from "firebase/firestore";
 
 import AES from 'crypto-js/aes';
 import Utf8 from 'crypto-js/enc-utf8';
@@ -14,12 +16,14 @@ const BREACH_CHECK_INTERVAL = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
 const LAST_BREACH_CHECK_KEY = 'last_breach_check';
 
 export default function List({ filter, filterText }) {
-  const { BREACH_RESULTS_KEY, MasterPassword, SECURE_STORE_KEY } = useKey();
+  const { BREACH_RESULTS_KEY, MasterPassword, SECURE_STORE_KEY, mail } = useKey();
   const { passwords, setPasswords, breachResults, updateBreachResults, loadData } = usePassword();
   const [expandedItems, setExpandedItems] = useState({});
   const [hide, setHide] = useState({});
   const [modalVisible, setModalVisible] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(null);
+  const [isSyncEnabled, setIsSyncEnabled] = useState(true);
+
 
   const getBreachStatus = (username: string) => {
     const result = breachResults.find(r => r.email === username);
@@ -141,6 +145,14 @@ export default function List({ filter, filterText }) {
             try {
               const newPasswords = passwords.filter((_, i) => i !== index);
 
+              const passwordToDelete = passwords[index];
+
+              // Delete from Firestore if password has an ID
+              if (passwordToDelete.id) {
+                const ref = collection(Firebase_DB, `${mail}_passwords`);
+                await deleteDoc(doc(ref, passwordToDelete.id));
+              }
+
               // Remove the password from AsyncStorage
               const storedData = await AsyncStorage.getItem(SECURE_STORE_KEY);
               if (storedData) {
@@ -154,7 +166,22 @@ export default function List({ filter, filterText }) {
               setShouldReload(prev => prev + 1);
             } catch (error) {
               console.error("Error deleting password:", error);
-              Alert.alert("Error", "Failed to delete password. Please try again.");
+              
+              if (!navigator.onLine) {
+                Alert.alert(
+                  "Network Error", 
+                  "No internet connection. The password will be marked for deletion when back online."
+                );
+                // Mark for deletion when back online
+                const passwordToDelete = passwords[index];
+                passwordToDelete.pendingDelete = true;
+                await AsyncStorage.setItem(SECURE_STORE_KEY, JSON.stringify(passwords));
+              } else {
+                Alert.alert(
+                  "Error",
+                  "Failed to delete password. Please try again."
+                );
+              }
             }
           },
         },
@@ -245,11 +272,113 @@ export default function List({ filter, filterText }) {
       );
     }
   });
+
+  interface PasswordData {
+    id?: string;
+    userId: string;
+    website: string;
+    username: string;
+    encryptedpassword: string;
+    encryptedEncryptionKey: string;
+    pendingSync?: boolean;
+    lastModified?: number;
+    tag?: string;
+  }
+
+  const fetchPasswords = async () => {
+    try {
+      const ref = collection(Firebase_DB, `${mail}_passwords`);
+      let firestorePasswords: PasswordData[] = [];
+
+      if (isSyncEnabled) {
+        const snapshot = await getDocs(query(ref));
+        firestorePasswords = snapshot.docs.map(doc => ({
+          ...doc.data() as PasswordData,
+          id: doc.id
+        }));
+      }
+
+      const asyncStoreData = await AsyncStorage.getItem(SECURE_STORE_KEY);
+      const localPasswords = asyncStoreData ? JSON.parse(asyncStoreData) as PasswordData[] : [];
+
+      // Handle pending sync passwords
+      if (isSyncEnabled) {
+        const pendingPasswords = localPasswords.filter(p => p.pendingSync);
+        for (const password of pendingPasswords) {
+          const { pendingSync, id, ...passwordData } = password;
+          const docRef = await addDoc(ref, {
+            ...passwordData,
+            lastModified: Date.now()
+          });
+          password.id = docRef.id;
+          password.pendingSync = false;
+        }
+      }
+
+      const mergedPasswords = mergePasswords(localPasswords, firestorePasswords);
+      await AsyncStorage.setItem(SECURE_STORE_KEY, JSON.stringify(mergedPasswords));
+      setPasswords(mergedPasswords);
+    } catch (error) {
+      console.error("Error fetching passwords:", error);
+      Alert.alert("Error", "Failed to fetch passwords. Please try again.");
+    }
+  };
+
+  const mergePasswords = (local: PasswordData[], cloud: PasswordData[]): PasswordData[] => {
+    const merged = new Map<string, PasswordData>();
+
+    // Add all cloud passwords to the map
+    cloud.forEach(cloudPassword => {
+      if (cloudPassword.id) {
+        merged.set(cloudPassword.id, {
+          ...cloudPassword,
+          lastModified: cloudPassword.lastModified || Date.now()
+        });
+      }
+    });
+
+    // Process local passwords
+    local.forEach(localPassword => {
+      if (localPassword.pendingSync) {
+        // Always keep pending sync passwords from local
+        if (localPassword.id) {
+          merged.set(localPassword.id, localPassword);
+        }
+      } else if (localPassword.id) {
+        const existingPassword = merged.get(localPassword.id);
+
+        // If password exists in both local and cloud, use the newer version
+        if (existingPassword) {
+          const localModified = localPassword.lastModified || 0;
+          const cloudModified = existingPassword.lastModified || 0;
+
+          if (localModified > cloudModified) {
+            merged.set(localPassword.id, {
+              ...localPassword,
+              lastModified: localModified
+            });
+          }
+        } else {
+          // If password only exists locally, add it
+          merged.set(localPassword.id, {
+            ...localPassword,
+            lastModified: localPassword.lastModified || Date.now()
+          });
+        }
+      }
+    });
+
+    // Convert map to array and sort by lastModified (newest first)
+    return Array.from(merged.values())
+      .sort((a, b) => (b.lastModified || 0) - (a.lastModified || 0));
+  };
+
   const [refreshing, setRefreshing] = React.useState(false);
 
   const onRefresh = React.useCallback(async () => {
     setRefreshing(true);
     try {
+      await fetchPasswords();
       await loadData();
       await checkForBreaches();
     } catch (error) {
