@@ -4,7 +4,7 @@ A secure, cross-platform password management application built with React Native
 ## 📱 Demo
 ![TabNavi Demo](./video.mov)
 
-> Note: If you want to see the full video demo, check out our [demo video](./video.mov) on Google Drive
+> Note: If you want to see the full video demo, check out our [demo video](./video.mov) on Google Drive.
 
 ## 🚀 Features
 - **Secure Storage**: Military-grade encryption for local and cloud storage of passwords
