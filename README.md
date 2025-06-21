@@ -1,6 +1,10 @@
 # TabNavi Password Manager
 A secure, cross-platform password management application built with React Native. TabNavi provides robust password management features including secure storage, password generation, and data breach monitoring, all while ensuring your credentials remain safe both online and offline.
 
+![Expo](https://img.shields.io/badge/Expo-47.0.0-blue)
+![React Native](https://img.shields.io/badge/React%20Native-0.72.0-blue)
+![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)
+
 ## 📱 Demo
 
 
