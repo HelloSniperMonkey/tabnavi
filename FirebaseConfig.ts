@@ -5,13 +5,13 @@ import { Platform } from 'react-native';
 
 // For Firebase JS SDK v7.20.0 and later, measurementId is optional
 const firebaseConfig = {
-  apiKey: "AIzaSyAmP99cf_txA7ghE9O7Q108-mlOVP2jH2Y",
-  authDomain: "manager-7e817.firebaseapp.com",
-  projectId: "manager-7e817",
-  storageBucket: "manager-7e817.appspot.com",
-  messagingSenderId: "255469065726",
-  appId: "1:255469065726:web:f75b1d485296b6f19fdcaf",
-  measurementId: "G-07TL8QXNRN"
+  apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY,
+  authDomain: process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN,
+  projectId: process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID,
+  storageBucket: process.env.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: process.env.EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+  appId: process.env.EXPO_PUBLIC_FIREBASE_APP_ID,
+  measurementId: process.env.EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID
 };
 
 // Initialize Firebase

@@ -9,6 +9,7 @@ import {
   ScrollView,
   ActivityIndicator,
   Platform,
+  TextInput,
 } from 'react-native';
 import { Icon } from '@rneui/themed';
 import * as DocumentPicker from 'expo-document-picker';
@@ -40,6 +41,8 @@ export default function BulkImport() {
   const [selectedFile, setSelectedFile] = useState<DocumentPicker.DocumentPickerResult | null>(null);
   const [previewData, setPreviewData] = useState<ParsedPassword[]>([]);
   const [showPreview, setShowPreview] = useState(false);
+  const [inputMode, setInputMode] = useState<'file' | 'text'>('file');
+  const [textInput, setTextInput] = useState('');
 
   const encrypt = (data: string, encryptionKey: string): string => {
     const initializationVector = WordArray.random(16);
@@ -134,6 +137,23 @@ export default function BulkImport() {
       console.error('Error selecting file:', error);
       Alert.alert('Error', 'Failed to select or read file');
     }
+  };
+
+  const processTextInput = () => {
+    if (!textInput.trim()) {
+      Alert.alert('Error', 'Please enter some password data');
+      return;
+    }
+
+    // Check content length
+    if (textInput.length > 100000) {
+      Alert.alert('Input Too Large', 'Input content is too large. Please reduce the number of passwords.');
+      return;
+    }
+
+    const parsedData = parsePasswordFile(textInput);
+    setPreviewData(parsedData);
+    setShowPreview(true);
   };
 
   const importPasswords = async () => {
@@ -235,7 +255,7 @@ export default function BulkImport() {
         <View style={styles.instructionsContainer}>
           <Text style={styles.instructionsTitle}>Import Format</Text>
           <Text style={styles.instructionsText}>
-            Upload a text file with passwords in this format:
+            Upload a text file or paste content with passwords in this format:
           </Text>
           <View style={styles.exampleContainer}>
             <Text style={styles.exampleText}>
@@ -255,18 +275,98 @@ twitter : twitterpass`}
         </View>
 
         {!showPreview ? (
-          <TouchableOpacity style={styles.selectButton} onPress={selectFile}>
-            <Icon name="file-upload" size={24} color="white" style={styles.buttonIcon} />
-            <Text style={styles.selectButtonText}>Select Text File</Text>
-          </TouchableOpacity>
+          <View>
+            {/* Input Mode Toggle */}
+            <View style={styles.toggleContainer}>
+              <TouchableOpacity
+                style={[
+                  styles.toggleButton,
+                  inputMode === 'file' && styles.toggleButtonActive,
+                ]}
+                onPress={() => {
+                  setInputMode('file');
+                  setTextInput('');
+                }}
+              >
+                <Icon 
+                  name="file-upload" 
+                  size={20} 
+                  color={inputMode === 'file' ? 'white' : '#007AFF'} 
+                />
+                <Text style={[
+                  styles.toggleButtonText,
+                  inputMode === 'file' && styles.toggleButtonTextActive,
+                ]}>
+                  Upload File
+                </Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                style={[
+                  styles.toggleButton,
+                  inputMode === 'text' && styles.toggleButtonActive,
+                ]}
+                onPress={() => {
+                  setInputMode('text');
+                  setSelectedFile(null);
+                }}
+              >
+                <Icon 
+                  name="edit" 
+                  size={20} 
+                  color={inputMode === 'text' ? 'white' : '#007AFF'} 
+                />
+                <Text style={[
+                  styles.toggleButtonText,
+                  inputMode === 'text' && styles.toggleButtonTextActive,
+                ]}>
+                  Paste Text
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            {inputMode === 'file' ? (
+              <TouchableOpacity style={styles.selectButton} onPress={selectFile}>
+                <Icon name="file-upload" size={24} color="white" style={styles.buttonIcon} />
+                <Text style={styles.selectButtonText}>Select Text File</Text>
+              </TouchableOpacity>
+            ) : (
+              <View style={styles.textInputContainer}>
+                <Text style={styles.textInputLabel}>Paste your password data:</Text>
+                <TextInput
+                  style={styles.textInput}
+                  multiline
+                  placeholder="Paste your password data here...&#10;&#10;Example:&#10;facebook : mypassword123&#10;google : anothersecretpass"
+                  value={textInput}
+                  onChangeText={setTextInput}
+                  textAlignVertical="top"
+                />
+                <TouchableOpacity
+                  style={[
+                    styles.processButton,
+                    !textInput.trim() && styles.processButtonDisabled,
+                  ]}
+                  onPress={processTextInput}
+                  disabled={!textInput.trim()}
+                >
+                  <Icon name="preview" size={24} color="white" style={styles.buttonIcon} />
+                  <Text style={styles.processButtonText}>Process Text</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+          </View>
         ) : (
           <View style={styles.previewContainer}>
             <View style={styles.previewHeader}>
               <Text style={styles.previewTitle}>
                 Preview ({previewData.length} passwords found)
               </Text>
-              <TouchableOpacity onPress={() => setShowPreview(false)}>
-                <Text style={styles.changeFileText}>Change File</Text>
+              <TouchableOpacity onPress={() => {
+                setShowPreview(false);
+                setSelectedFile(null);
+                setTextInput('');
+              }}>
+                <Text style={styles.changeFileText}>Change Input</Text>
               </TouchableOpacity>
             </View>
 
@@ -454,6 +554,84 @@ const styles = StyleSheet.create({
     backgroundColor: '#ccc',
   },
   importButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  toggleContainer: {
+    flexDirection: 'row',
+    marginBottom: 16,
+    backgroundColor: '#f0f0f0',
+    borderRadius: 8,
+    padding: 4,
+  },
+  toggleButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 6,
+    backgroundColor: 'transparent',
+  },
+  toggleButtonActive: {
+    backgroundColor: '#007AFF',
+  },
+  toggleButtonText: {
+    marginLeft: 8,
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#007AFF',
+  },
+  toggleButtonTextActive: {
+    color: 'white',
+  },
+  textInputContainer: {
+    marginTop: 8,
+  },
+  textInputLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 8,
+  },
+  textInput: {
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    padding: 16,
+    fontSize: 16,
+    backgroundColor: '#f9f9f9',
+    minHeight: 150,
+    maxHeight: 300,
+    marginBottom: 16,
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+  },
+  processButton: {
+    backgroundColor: '#007AFF',
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+    borderRadius: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.2,
+        shadowRadius: 4,
+      },
+      android: {
+        elevation: 4,
+      },
+    }),
+  },
+  processButtonDisabled: {
+    backgroundColor: '#ccc',
+  },
+  processButtonText: {
     color: 'white',
     fontSize: 16,
     fontWeight: '600',

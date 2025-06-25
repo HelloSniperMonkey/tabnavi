@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Text, View, FlatList, StyleSheet, TouchableOpacity, Alert, Clipboard, Modal, RefreshControl } from "react-native";
 import { ListItem, Icon } from '@rneui/themed';
 import { usePassword, useKey } from './PasswordContext';
+import { useSync } from './SyncContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { checkDataBreaches } from './DataBreach';
 import { Firebase_DB } from "../../FirebaseConfig";
@@ -18,11 +19,11 @@ const LAST_BREACH_CHECK_KEY = 'last_breach_check';
 export default function List({ filter, filterText }) {
   const { BREACH_RESULTS_KEY, MasterPassword, SECURE_STORE_KEY, mail } = useKey();
   const { passwords, setPasswords, breachResults, updateBreachResults, loadData } = usePassword();
+  const { isSyncEnabled } = useSync();
   const [expandedItems, setExpandedItems] = useState({});
   const [hide, setHide] = useState({});
   const [modalVisible, setModalVisible] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(null);
-  const [isSyncEnabled, setIsSyncEnabled] = useState(true);
 
 
   const getBreachStatus = (username: string) => {

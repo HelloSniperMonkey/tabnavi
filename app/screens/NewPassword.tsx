@@ -7,6 +7,7 @@ import React, { useState, useEffect } from "react";
 import { View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet, Alert } from "react-native";
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { usePassword, useKey } from '../components/PasswordContext';
+import { useSync } from '../components/SyncContext';
 import uuid from 'react-native-uuid';
 import { Firebase_Auth, Firebase_DB } from "../../FirebaseConfig";
 import { collection, addDoc, getDocs, query, where, Firestore } from "firebase/firestore";
@@ -15,10 +16,10 @@ import NetInfo from "@react-native-community/netinfo";
 function PasswordForm({ navigation }) {
   const { SECURE_STORE_KEY, MasterPassword, mail } = useKey();
   const { passwords, setPasswords } = usePassword();
+  const { isSyncEnabled } = useSync();
   const [website, setWebsite] = useState('');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const [isSyncEnabled, setIsSyncEnabled] = useState(true);
   const [strength, setStrength] = useState({ score: 0, strength: 'very weak' });
 
   const encrypt = (data = '', encryptionKey = '') => {

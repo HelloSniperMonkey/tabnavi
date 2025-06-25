@@ -6,20 +6,21 @@ import { Firebase_Auth } from "../../FirebaseConfig";
 import { useNavigation } from "@react-navigation/native";
 import { useKey, usePassword } from '../components/PasswordContext';
 import { useAuth } from '../components/AuthContext'
+import { useSyncWithContext } from '../components/useSyncWithContext';
 import { checkDataBreaches } from '../components/DataBreach';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const LAST_BREACH_CHECK_KEY = 'last_breach_check';
 
 export default function Index() {
-  const [isSyncEnabled, setIsSyncEnabled] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const navigation = useNavigation();
   const { passwords, updateBreachResults , clearPasswords} = usePassword();
   const { clearKeys } = useKey();
   const { clearAuthKeys } = useAuth();
+  const { isSyncEnabled, setSyncEnabled, isOnline, lastSyncTime, syncPasswords } = useSyncWithContext();
 
-  const toggleSwitch = () => setIsSyncEnabled(previousState => !previousState);
+  const toggleSwitch = () => setSyncEnabled(!isSyncEnabled);
 
   const Logout = async () => {
     try {
@@ -89,7 +90,17 @@ export default function Index() {
     <SafeAreaView style={styles.container}>
       <View style={styles.contentContainer}>
         <View style={styles.itemContainer}>
-          <Text style={styles.label}>Sync</Text>
+          <View style={styles.syncInfo}>
+            <Text style={styles.label}>Cloud Sync</Text>
+            <Text style={styles.syncStatus}>
+              {isSyncEnabled ? (isOnline ? '🟢 Online' : '🟡 Offline') : '🔴 Disabled'}
+            </Text>
+            {lastSyncTime && isSyncEnabled && (
+              <Text style={styles.lastSync}>
+                Last sync: {lastSyncTime.toLocaleTimeString()}
+              </Text>
+            )}
+          </View>
           <Switch
             trackColor={{ false: "#767577", true: "#4CAF50" }}
             thumbColor={isSyncEnabled ? "#ffffff" : "#f4f3f4"}
@@ -97,6 +108,38 @@ export default function Index() {
             value={isSyncEnabled}
           />
         </View>
+        
+        {isSyncEnabled && (
+          <View style={styles.syncDescription}>
+            <Text style={styles.descriptionText}>
+              When enabled, your passwords are securely synced to the cloud. 
+              All data is encrypted end-to-end before leaving your device.
+            </Text>
+            <TouchableOpacity
+              style={[styles.syncButton, !isOnline && styles.disabledButton]}
+              onPress={async () => {
+                if (isOnline) {
+                  setIsLoading(true);
+                  try {
+                    await syncPasswords();
+                    Alert.alert('Success', 'Passwords synced successfully');
+                  } catch (error) {
+                    Alert.alert('Error', 'Failed to sync passwords');
+                  } finally {
+                    setIsLoading(false);
+                  }
+                } else {
+                  Alert.alert('Offline', 'Please check your internet connection');
+                }
+              }}
+              disabled={!isOnline || isLoading}
+            >
+              <Text style={styles.syncButtonText}>
+                {isLoading ? 'Syncing...' : 'Sync Now'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        )}
       </View>
       <View style={styles.bottomContainer2}>
         <TouchableOpacity
@@ -166,6 +209,43 @@ const styles = StyleSheet.create({
     fontSize: 18,
     color: '#333333',
     fontWeight: '500',
+  },
+  syncInfo: {
+    flex: 1,
+  },
+  syncStatus: {
+    fontSize: 14,
+    color: '#666666',
+    marginTop: 2,
+  },
+  lastSync: {
+    fontSize: 12,
+    color: '#999999',
+    marginTop: 2,
+  },
+  syncDescription: {
+    backgroundColor: '#f8f9fa',
+    borderRadius: 8,
+    padding: 12,
+    marginTop: 10,
+  },
+  descriptionText: {
+    fontSize: 14,
+    color: '#666666',
+    lineHeight: 20,
+  },
+  syncButton: {
+    backgroundColor: '#007AFF',
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    marginTop: 12,
+    alignItems: 'center',
+  },
+  syncButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
   },
   primaryButton: {
     backgroundColor: '#007AFF',

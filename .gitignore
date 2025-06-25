@@ -12,6 +12,7 @@ web-build/
 .gradle
 /android
 /ios
+.env
 
 # macOS
 .DS_Store
