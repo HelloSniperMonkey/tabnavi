@@ -17,7 +17,7 @@ export default function PasswordList() {
   const SocialList = () => <List filter="social" filterText={searchText} />;
   const BankingList = () => <List filter="banking" filterText={searchText} />;
 
-  const handleKeystroke = (text) => {
+  const handleKeystroke = (text: string) => {
     return <List filter="" filterText={text}/>
   }
   
@@ -51,6 +51,13 @@ export default function PasswordList() {
             onChangeText={setSearchText}
           />
         </View>
+        
+        <TouchableOpacity
+          style={styles.bulkImportButton}
+          onPress={() => navigation.navigate('BulkImport')}
+        >
+          <Icon name="upload-file" color="white" size={20} />
+        </TouchableOpacity>
         
         <TouchableOpacity
           style={styles.addButton}
@@ -100,7 +107,7 @@ const styles = StyleSheet.create({
   },
   searchContainer: {
     flex: 1,
-    marginRight: 16,
+    marginRight: 12,
   },
   search: {
     height: 48,
@@ -117,6 +124,26 @@ const styles = StyleSheet.create({
       },
       android: {
         elevation: 2,
+      },
+    }),
+  },
+  bulkImportButton: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#28a745',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.2,
+        shadowRadius: 4,
+      },
+      android: {
+        elevation: 4,
       },
     }),
   },

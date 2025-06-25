@@ -23,6 +23,36 @@ https://github.com/user-attachments/assets/9101c93b-c33f-4c10-84d9-c63d28e44f35
 - **Password Recovery**: Secure recovery mechanisms via email 
 - **Breach Monitoring**: Real-time alerts for compromised credentials
 - **Offline Access**: Secure access to encrypted passwords without internet connection
+- **Bulk Import**: Import multiple passwords from text files (format: `website : password`)
+- **Web Support**: Full-featured web application for desktop access
+- **Bulk Import**: Import multiple passwords from text files with format validation
+
+## 📁 Bulk Import Feature
+
+TabNavi supports importing multiple passwords from text files for easy migration from other password managers.
+
+### Format
+Create a text file with the following format:
+```
+website : password
+another-site : anotherPassword
+# Comments are ignored
+work-portal : workPassword123
+```
+
+### How to Use
+1. Open TabNavi Password Manager
+2. Go to the "Passwords" tab
+3. Tap the green upload button (📁) next to the add (+) button
+4. Select your text file
+5. Review the preview and tap "Import All Passwords"
+
+### Security
+- All passwords are encrypted using AES-256 encryption during import
+- Your master password is used as the encryption key
+- Files are processed locally and not stored in plain text
+
+For detailed instructions, see [BULK_IMPORT_GUIDE.md](./BULK_IMPORT_GUIDE.md)
 
 ## 🛠 Tech Stack
 - React Native
@@ -79,10 +109,19 @@ npm start
 npm run ios
 ```
 
-### Android
+### Web
 ```bash
-# Run on Android emulator
-npm run android
+# Run on web browser
+npm run web
+```
+
+### Building for Production
+```bash
+# Build web version
+npx expo export --platform web
+
+# Deploy to Firebase (if configured)
+firebase deploy --only hosting
 ```
 
 ## 📁 Project Structure

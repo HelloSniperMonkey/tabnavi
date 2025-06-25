@@ -1,7 +1,7 @@
 import { initializeApp } from "firebase/app";
-import { initializeAuth, getReactNativePersistence } from 'firebase/auth';
+import { initializeAuth, getReactNativePersistence, getAuth, browserLocalPersistence, browserSessionPersistence } from 'firebase/auth';
 import { getFirestore } from "firebase/firestore";
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Platform } from 'react-native';
 
 // For Firebase JS SDK v7.20.0 and later, measurementId is optional
 const firebaseConfig = {
@@ -17,9 +17,18 @@ const firebaseConfig = {
 // Initialize Firebase
 export const Firebase_App = initializeApp(firebaseConfig);
 
-// Initialize Auth with persistence
-export const Firebase_Auth = initializeAuth(Firebase_App, {
-  persistence: getReactNativePersistence(AsyncStorage)
-});
+// Initialize Auth with platform-specific persistence
+let Firebase_Auth;
+if (Platform.OS === 'web') {
+  // For web, use the default getAuth which includes browser persistence
+  Firebase_Auth = getAuth(Firebase_App);
+} else {
+  // For React Native, use AsyncStorage persistence
+  const AsyncStorage = require('@react-native-async-storage/async-storage').default;
+  Firebase_Auth = initializeAuth(Firebase_App, {
+    persistence: getReactNativePersistence(AsyncStorage)
+  });
+}
 
+export { Firebase_Auth };
 export const Firebase_DB = getFirestore(Firebase_App);

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import TabNavigator from './TabNavigator';
 import NewPassword from '../screens/NewPassword';
+import BulkImport from '../screens/BulkImport';
 import * as LocalAuthentication from 'expo-local-authentication';
 import { View, Text } from 'react-native';
 
@@ -99,6 +100,15 @@ export default function MainStack() {
           headerShown: false ,
           presentation: 'modal',
           title: 'Add Password'
+        }}
+      />
+      <Stack.Screen
+        name="BulkImport"
+        component={BulkImport}
+        options={{
+          headerShown: false,
+          presentation: 'modal',
+          title: 'Bulk Import'
         }}
       />
     </Stack.Navigator>
