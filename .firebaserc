@@ -1,5 +1,8 @@
 {
   "projects": {
-    "default": "password-manager-65155"
-  }
+    "default": "password-manager-65155",
+    "prod": "password-manager-65155"
+  },
+  "targets": {},
+  "etags": {}
 }
